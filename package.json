@@ -1,0 +1,52 @@
+{
+  "name": "@appfreeticket/cli",
+  "version": "0.1.0",
+  "description": "CLI oficial de FreeTicket — consume la API REST B2B (eventos, ventas, tickets, membresías, venues, staff, informes).",
+  "keywords": ["freeticket", "cli", "ticketing", "eventos", "api"],
+  "homepage": "https://github.com/AppFreeticket/freeticket-cli#readme",
+  "bugs": "https://github.com/AppFreeticket/freeticket-cli/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AppFreeticket/freeticket-cli.git"
+  },
+  "license": "MIT",
+  "author": "FreeTicket",
+  "type": "module",
+  "bin": {
+    "ft": "dist/index.js"
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "generate": "openapi-ts",
+    "sync-openapi": "tsx scripts/sync-openapi.ts",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@hey-api/client-fetch": "^0.10.0",
+    "chalk": "^5.4.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@hey-api/openapi-ts": "^0.64.0",
+    "@types/node": "^22.10.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+# cliente generado desde openapi.json — se regenera con `pnpm generate`
+src/client/
+*.log
+.DS_Store
+.env
