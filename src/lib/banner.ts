@@ -1,7 +1,11 @@
-import chalk from "chalk";
+import { Chalk } from "chalk";
 
 const YELLOW = "#FFD500";
-const TEAL = "#07C2BA";
+
+// El banner es decorativo (solo aparece sin comando o con --help), así que
+// forzamos truecolor para que SIEMPRE salga amarillo, incluso si chalk no
+// detecta soporte de color en la terminal.
+const c = new Chalk({ level: 3 });
 
 // ASCII art mostrado al ejecutar `ft` sin comando (o con --help).
 const ART = String.raw`
@@ -13,8 +17,10 @@ const ART = String.raw`
 
 export function banner(): string {
   return [
-    chalk.hex(YELLOW)(ART),
-    `  ${chalk.hex(TEAL)("●")} CLI oficial de ${chalk.hex(YELLOW).bold("FreeTicket")} ${chalk.dim("— eventos, tickets y ventas desde tu terminal")}`,
+    c.hex(YELLOW)(ART),
+    c.hex(YELLOW)("  ● ") +
+      c.hex(YELLOW).bold("FreeTicket") +
+      c.hex(YELLOW)(" — eventos, tickets y ventas desde tu terminal"),
     "",
   ].join("\n");
 }
