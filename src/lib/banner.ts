@@ -2,12 +2,12 @@ import { Chalk } from "chalk";
 
 const YELLOW = "#FFD500";
 
-// El banner es decorativo (solo aparece sin comando o con --help), así que
-// forzamos truecolor para que SIEMPRE salga amarillo, incluso si chalk no
-// detecta soporte de color en la terminal.
+// The banner is decorative (only shown without a command or with --help), so
+// force truecolor to keep it yellow even when chalk does not detect terminal
+// color support.
 const c = new Chalk({ level: 3 });
 
-// ASCII art mostrado al ejecutar `ft` sin comando (o con --help).
+// ASCII art shown when running `ft` without a command (or with --help).
 const ART = String.raw`
   ___ ___ ___ ___ _____ ___ ___ _  _____ _____
  | __| _ \ __| __|_   _|_ _/ __| |/ / __|_   _|
@@ -20,7 +20,7 @@ export function banner(): string {
     c.hex(YELLOW)(ART),
     c.hex(YELLOW)("  ● ") +
       c.hex(YELLOW).bold("FreeTicket") +
-      c.hex(YELLOW)(" — eventos, tickets y ventas desde tu terminal"),
+      c.hex(YELLOW)(" — events, tickets, and sales from your terminal"),
     "",
   ].join("\n");
 }

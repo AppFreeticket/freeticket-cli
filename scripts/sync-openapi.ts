@@ -1,4 +1,4 @@
-// Descarga el contrato OpenAPI del backend y regenera el cliente.
+// Downloads the backend OpenAPI contract and regenerates the client.
 //   FT_OPENAPI_URL=https://admin.appfreeticket.com/api/v1/openapi.json pnpm sync-openapi
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -9,12 +9,12 @@ const url =
 
 const res = await fetch(url);
 if (!res.ok) {
-  console.error(`No se pudo bajar el spec (${res.status}) de ${url}`);
+  console.error(`Could not download the spec (${res.status}) from ${url}`);
   process.exit(1);
 }
 const spec = await res.json();
 writeFileSync("openapi.json", `${JSON.stringify(spec, null, 2)}\n`);
-console.log(`✓ openapi.json actualizado desde ${url}`);
+console.log(`✓ openapi.json updated from ${url}`);
 
 execSync("pnpm generate", { stdio: "inherit" });
-console.log("✓ cliente regenerado en src/client/");
+console.log("✓ client regenerated in src/client/");

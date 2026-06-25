@@ -1,8 +1,8 @@
 {
-  "name": "@appfreeticket/cli",
-  "version": "0.1.0",
-  "description": "CLI oficial de FreeTicket — consume la API REST B2B (eventos, ventas, tickets, membresías, venues, staff, informes).",
-  "keywords": ["freeticket", "cli", "ticketing", "eventos", "api"],
+  "name": "@freeticket/cli",
+  "version": "0.1.1",
+  "description": "Official FreeTicket CLI — consumes the B2B REST API for events, sales, tickets, memberships, venues, staff, and reports.",
+  "keywords": ["freeticket", "cli", "ticketing", "events", "api"],
   "homepage": "https://github.com/AppFreeticket/freeticket-cli#readme",
   "bugs": "https://github.com/AppFreeticket/freeticket-cli/issues",
   "repository": {

@@ -1,15 +1,23 @@
 # Changelog
 
-Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/);
-versionado [SemVer](https://semver.org/lang/es/).
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-25
+
+### Changed
+- Translate package documentation and CLI user-facing text to English.
+- Publish under the `@freeticket/cli` npm scope.
+
+## [0.1.0] - 2026-06-25
+
 ### Added
-- CLI inicial `ft` generado desde el contrato OpenAPI 3.1 de la API B2B v1.
-- Autenticación por API key (`ft login` / `whoami` / `logout` / `config`).
-- Lecturas: `events`, `ticket-types`, `sales`, `plans`, `venues`, `staff`,
+- Initial `ft` CLI generated from the OpenAPI 3.1 contract for the B2B API v1.
+- API key authentication (`ft login` / `whoami` / `logout` / `config`).
+- Read commands: `events`, `ticket-types`, `sales`, `plans`, `venues`, `staff`,
   `reports summary`, `reports export buyers|subscribers`.
-- Flags comunes `--json`, `--workspace`, `--limit`, `--cursor` y paginación por cursor.
-- Banner ASCII de FreeTicket al ejecutar `ft` sin comando.
-- Subagentes de Claude Code para revisión e integración (`.claude/agents/`).
+- Common flags: `--json`, `--workspace`, `--limit`, `--cursor`, and cursor pagination.
+- FreeTicket ASCII banner when running `ft` without a command.
+- Claude Code subagents for review and integration (`.claude/agents/`).

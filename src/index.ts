@@ -1,5 +1,5 @@
 import { Command } from "commander";
-// versión sincronizada con package.json en build (tsup la inyecta vía import).
+// Version synced with package.json at build time (tsup injects it via import).
 import pkg from "../package.json" with { type: "json" };
 import {
   getEvents,
@@ -23,7 +23,7 @@ const program = new Command();
 
 program
   .name("ft")
-  .description("CLI oficial de FreeTicket")
+  .description("Official FreeTicket CLI")
   .version(pkg.version, "-v, --version")
   .addHelpText("beforeAll", banner());
 
@@ -31,7 +31,7 @@ registerAuth(program);
 
 registerResource(program, {
   name: "events",
-  describe: "Eventos",
+  describe: "Events",
   list: getEvents,
   get: getEventsId,
   columns: ["id", "name", "status", "startsAt"],
@@ -39,25 +39,25 @@ registerResource(program, {
 
 registerResource(program, {
   name: "sales",
-  describe: "Ventas",
+  describe: "Sales",
   list: getSales,
   get: getSalesId,
   columns: ["id", "reference", "status", "total", "currency", "createdAt"],
   listFlags: [
-    { flag: "--status <s>", describe: "filtra por estado", query: "status" },
+    { flag: "--status <s>", describe: "filter by status", query: "status" },
   ],
 });
 
 registerResource(program, {
   name: "ticket-types",
-  describe: "Tipos de ticket",
+  describe: "Ticket types",
   list: getTicketTypes,
   get: getTicketTypesId,
   columns: ["id", "name", "price", "currency", "stock"],
   listFlags: [
     {
       flag: "--event-date-id <id>",
-      describe: "filtra por fecha de evento",
+      describe: "filter by event date",
       query: "eventDateId",
     },
   ],
@@ -65,7 +65,7 @@ registerResource(program, {
 
 registerResource(program, {
   name: "plans",
-  describe: "Planes de membresía",
+  describe: "Membership plans",
   list: getMembershipPlans,
   get: getMembershipPlansId,
   columns: ["id", "name", "price", "currency", "interval"],
@@ -81,14 +81,14 @@ registerResource(program, {
 
 registerResource(program, {
   name: "staff",
-  describe: "Staff del workspace",
+  describe: "Workspace staff",
   list: getStaff,
   columns: ["id", "name", "email", "role"],
 });
 
 registerReports(program);
 
-// Sin argumentos → banner + ayuda.
+// No arguments -> banner + help.
 if (process.argv.length <= 2) {
   console.log(banner());
   program.outputHelp();

@@ -2,15 +2,13 @@ import { client } from "../client/client.gen";
 import { loadConfig } from "./config";
 
 /**
- * Configura el cliente generado con la base URL + headers de auth.
- * Llamar una vez al inicio de cada comando, con el override opcional de workspace.
+ * Configures the generated client with the base URL + auth headers.
+ * Call once at the start of each command, with an optional workspace override.
  */
 export function configureClient(workspaceOverride?: string): void {
   const cfg = loadConfig();
   if (!cfg.apiKey) {
-    fail(
-      "No hay API key configurada. Ejecuta `ft login` o exporta FT_API_KEY.",
-    );
+    fail("No API key configured. Run `ft login` or export FT_API_KEY.");
   }
   const workspaceId = workspaceOverride ?? cfg.workspaceId;
   client.setConfig({
@@ -29,8 +27,8 @@ type ApiError = {
 };
 
 /**
- * Desempaqueta la respuesta del cliente generado: devuelve `data` o aborta
- * con un mensaje legible a partir del envelope `{ error: { code, message } }`.
+ * Unwraps the generated client response: returns `data` or aborts with a
+ * readable message from the `{ error: { code, message } }` envelope.
  */
 export function unwrap<T>(res: {
   data?: T;
@@ -42,29 +40,31 @@ export function unwrap<T>(res: {
   const err = (res.error as { error?: ApiError })?.error;
   if (err) {
     const lines = [
-      `Error ${status ?? ""} [${err.code ?? "?"}]: ${err.message ?? "fallo desconocido"}`.trim(),
+      `Error ${status ?? ""} [${err.code ?? "?"}]: ${err.message ?? "unknown failure"}`.trim(),
     ];
     for (const d of err.details ?? [])
       lines.push(`  · ${d.path ?? ""}: ${d.message ?? ""}`.trimEnd());
     fail(lines.join("\n"), hintFor(status));
   }
-  fail(`La API respondió ${status ?? "un error"} sin cuerpo interpretable.`);
+  fail(
+    `The API responded with ${status ?? "an error"} without a readable body.`,
+  );
 }
 
 function hintFor(status?: number): string | undefined {
   switch (status) {
     case 401:
-      return "API key inválida, revocada o expirada. Ejecuta `ft login`.";
+      return "Invalid, revoked, or expired API key. Run `ft login`.";
     case 403:
-      return "Tu rol o tu workspace no permiten esta acción.";
+      return "Your role or workspace does not allow this action.";
     case 404:
-      return "El recurso no existe o pertenece a otro workspace.";
+      return "The resource does not exist or belongs to another workspace.";
     case 501:
-      return "Operación de escritura: disponible en la fase 2 del CLI.";
+      return "Write operation: planned for CLI phase 2.";
   }
 }
 
-/** Imprime el error en rojo (+ hint opcional) y termina con código 1. */
+/** Prints the error (+ optional hint) and exits with code 1. */
 export function fail(message: string, hint?: string): never {
   console.error(message);
   if (hint) console.error(`\n${hint}`);

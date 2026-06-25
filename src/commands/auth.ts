@@ -8,37 +8,35 @@ import { print } from "../lib/output";
 export function registerAuth(program: Command): void {
   program
     .command("login")
-    .description(
-      "Guarda la API key y el workspace en ~/.freeticket/config.json",
-    )
+    .description("Store the API key and workspace in ~/.freeticket/config.json")
     .requiredOption(
       "--key <ft_live_…>",
-      "API key emitida en el backend (pnpm api:key)",
+      "API key issued in the backend (pnpm api:key)",
     )
     .option(
       "--url <url>",
-      "base URL de la API (default: https://admin.appfreeticket.com)",
+      "API base URL (default: https://admin.appfreeticket.com)",
     )
-    .option("--workspace <id>", "workspace activo por defecto")
+    .option("--workspace <id>", "default active workspace")
     .action(async (opts) => {
       saveConfig({
         apiKey: opts.key,
         ...(opts.url ? { apiUrl: opts.url } : {}),
         ...(opts.workspace ? { workspaceId: opts.workspace } : {}),
       });
-      // Verifica la key contra /me antes de declarar éxito.
+      // Verify the key against /me before reporting success.
       configureClient(opts.workspace);
       const me = unwrap(await getMe({})).data;
       console.log(
-        `${chalk.green("✓")} Sesión guardada en ${chalk.dim(CONFIG_PATH)}`,
+        `${chalk.green("✓")} Session saved in ${chalk.dim(CONFIG_PATH)}`,
       );
       print(me, {});
     });
 
   program
     .command("whoami")
-    .description("Muestra el usuario autenticado y sus workspaces (GET /me)")
-    .option("--json", "salida JSON cruda")
+    .description("Show the authenticated user and workspaces (GET /me)")
+    .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureClient();
       const me = unwrap(await getMe({})).data;
@@ -47,17 +45,17 @@ export function registerAuth(program: Command): void {
 
   program
     .command("logout")
-    .description("Borra la API key guardada")
+    .description("Remove the stored API key")
     .action(() => {
       saveConfig({ apiKey: undefined });
       console.log(
-        `${chalk.green("✓")} API key eliminada de ${chalk.dim(CONFIG_PATH)}`,
+        `${chalk.green("✓")} API key removed from ${chalk.dim(CONFIG_PATH)}`,
       );
     });
 
   program
     .command("config")
-    .description("Muestra la configuración activa (la API key se enmascara)")
+    .description("Show active configuration (the API key is masked)")
     .action(() => {
       const cfg = loadConfig();
       print(

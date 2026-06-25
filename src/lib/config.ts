@@ -22,8 +22,8 @@ function readFile(): Partial<FtConfig> {
 }
 
 /**
- * Config resuelta para el proceso actual.
- * Precedencia: env vars > ~/.freeticket/config.json > default.
+ * Resolved config for the current process.
+ * Precedence: env vars > ~/.freeticket/config.json > default.
  */
 export function loadConfig(): FtConfig {
   const file = readFile();
@@ -34,11 +34,11 @@ export function loadConfig(): FtConfig {
   };
 }
 
-/** Persiste cambios en ~/.freeticket/config.json (merge con lo existente). */
+/** Persists changes to ~/.freeticket/config.json (merged with existing values). */
 export function saveConfig(patch: Partial<FtConfig>): void {
   const next = { ...readFile(), ...patch };
   mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-  // 0600: el archivo guarda la API key.
+  // 0600: the file stores the API key.
   writeFileSync(CONFIG_PATH, `${JSON.stringify(next, null, 2)}\n`, {
     mode: 0o600,
   });

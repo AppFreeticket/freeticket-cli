@@ -3,13 +3,13 @@ import Table from "cli-table3";
 
 interface PrintOpts {
   json?: boolean;
-  /** Columnas a mostrar en modo tabla (orden). Si se omite, se infieren del 1er objeto. */
+  /** Columns to show in table mode (order). Inferred from the first object if omitted. */
   columns?: string[];
 }
 
 /**
- * Imprime `data`. Con `--json` vuelca el JSON crudo. Si es un array de objetos
- * planos, dibuja una tabla; cualquier otra cosa se imprime como JSON.
+ * Prints `data`. With `--json`, dumps raw JSON. If it is an array of flat
+ * objects, draws a table; anything else is printed as JSON.
  */
 export function print(data: unknown, opts: PrintOpts = {}): void {
   if (opts.json) {
@@ -18,7 +18,7 @@ export function print(data: unknown, opts: PrintOpts = {}): void {
   }
   if (Array.isArray(data) && data.every(isPlainRow)) {
     if (data.length === 0) {
-      console.log(chalk.dim("(sin resultados)"));
+      console.log(chalk.dim("(no results)"));
       return;
     }
     const cols = opts.columns ?? Object.keys(data[0] as object);
@@ -32,10 +32,10 @@ export function print(data: unknown, opts: PrintOpts = {}): void {
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
 }
 
-/** Pista de paginación en stderr para no contaminar la salida `--json`. */
+/** Pagination hint on stderr to avoid contaminating `--json` output. */
 export function printNextCursor(page?: { nextCursor?: string | null }): void {
   if (page?.nextCursor) {
-    console.error(chalk.dim(`\nMás resultados: --cursor ${page.nextCursor}`));
+    console.error(chalk.dim(`\nMore results: --cursor ${page.nextCursor}`));
   }
 }
 

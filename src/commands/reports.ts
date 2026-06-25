@@ -8,14 +8,14 @@ import { configureClient, unwrap } from "../lib/api";
 import { print } from "../lib/output";
 
 export function registerReports(program: Command): void {
-  const root = program.command("reports").description("KPIs y exportaciones");
+  const root = program.command("reports").description("KPIs and exports");
 
   root
     .command("summary")
-    .description("Resumen de KPIs del workspace")
+    .description("Workspace KPI summary")
     .option("--period <p>", "7d | 30d | 90d | 1y", "30d")
-    .option("--workspace <id>", "override del workspace")
-    .option("--json", "salida JSON cruda")
+    .option("--workspace <id>", "workspace override")
+    .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
@@ -26,17 +26,17 @@ export function registerReports(program: Command): void {
 
   const exp = root
     .command("export")
-    .description("Exporta compradores o suscriptores (CSV)");
+    .description("Export buyers or subscribers (CSV)");
 
   for (const [name, fn, label] of [
-    ["buyers", getReportsExportsBuyers, "compradores"],
-    ["subscribers", getReportsExportsSubscribers, "suscriptores"],
+    ["buyers", getReportsExportsBuyers, "buyers"],
+    ["subscribers", getReportsExportsSubscribers, "subscribers"],
   ] as const) {
     exp
       .command(name)
-      .description(`Exporta ${label}`)
-      .option("--workspace <id>", "override del workspace")
-      .option("--json", "salida JSON cruda")
+      .description(`Export ${label}`)
+      .option("--workspace <id>", "workspace override")
+      .option("--json", "raw JSON output")
       .action(async (opts) => {
         configureClient(opts.workspace);
         const body = unwrap(await fn({}));

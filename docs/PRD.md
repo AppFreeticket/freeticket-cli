@@ -1,60 +1,60 @@
 # PRD — FreeTicket CLI (`ft`)
 
-> Documento de producto del cliente de línea de comandos de FreeTicket.
-> Estado global: **Fase 1 (lecturas) ✅ publicada**. Fase 2 (escrituras) 🟡 en diseño.
-> Última actualización: 2026-06-24 · Versión: 1.0
+> Product document for the FreeTicket command-line client.
+> Global status: **Phase 1 (reads) ✅ published**. Phase 2 (writes) 🟡 in design.
+> Last updated: 2026-06-24 · Version: 1.0
 
-Leyenda de estado: ✅ hecho · 🟡 en progreso/planeado · ⛔ recortado · 🔮 futuro.
+Status legend: ✅ done · 🟡 in progress/planned · ⛔ cut · 🔮 future.
 
 ---
 
-## 1. Resumen
+## 1. Summary
 
-`ft` es el cliente de terminal oficial de FreeTicket. Consume la **API REST B2B v1**
-(`/api/v1`) y permite a organizadores, artistas y venues inspeccionar y —en fase 2—
-operar su workspace sin abrir el dashboard web. El cliente se **genera desde el
-contrato OpenAPI 3.1** del backend, de modo que el CLI nunca queda desincronizado
-con la API.
+`ft` is the official FreeTicket terminal client. It consumes the **B2B REST API v1**
+(`/api/v1`) and lets organizers, artists, and venues inspect and, in phase 2,
+operate their workspace without opening the web dashboard. The client is
+**generated from the OpenAPI 3.1 contract**, so it never drifts out of sync with
+the API.
 
-Repo: `github.com/AppFreeticket/freeticket-cli` · paquete npm `@appfreeticket/cli`
-· binario `ft`.
+Repo: `github.com/AppFreeticket/freeticket-cli` · npm package `@freeticket/cli`
+· binary `ft`.
 
-## 2. Problema y oportunidad
+## 2. Problem and opportunity
 
-- Los operadores avanzados (productoras con muchos eventos, equipos técnicos)
-  necesitan **consultas rápidas, repetibles y scriptables** que el dashboard no da:
-  exportar compradores a un pipeline, revisar ventas en CI, auditar KPIs por cron.
-- La API B2B ya existe y está documentada; falta la **superficie de consumo
-  ergonómica** que la haga usable sin escribir `curl` a mano.
-- Un CLic generado desde OpenAPI es **barato de mantener**: cada endpoint nuevo del
-  backend se vuelve un comando con un `pnpm sync-openapi`.
+- Advanced operators (producers with many events, technical teams) need **fast,
+  repeatable, scriptable queries** that the dashboard does not provide: exporting
+  buyers into a pipeline, checking sales in CI, auditing KPIs through cron.
+- The B2B API already exists and is documented; what is missing is an ergonomic
+  consumption surface that makes it useful without hand-writing `curl`.
+- A CLI generated from OpenAPI is **cheap to maintain**: every new backend
+  endpoint becomes a command with `pnpm sync-openapi`.
 
-## 3. Usuarios y casos de uso
+## 3. Users and use cases
 
-| Usuario | Rol API | Caso de uso típico |
+| User | API role | Typical use case |
 |---|---|---|
-| Productora / organizador | ADMIN | Exportar compradores y suscriptores; revisar ventas; KPIs por período. |
-| Equipo técnico / data | ADMIN/VIEWER | `--json` a `jq`/scripts; auditorías programadas; tableros propios. |
-| Staff de taquilla | STAFF | Consultar ventas y su estado. |
-| Integrador externo | según key | Construir automatizaciones sobre la API sin tocar el dashboard. |
+| Producer / organizer | ADMIN | Export buyers and subscribers; review sales; KPIs by period. |
+| Technical / data team | ADMIN/VIEWER | Pipe `--json` into `jq`/scripts; scheduled audits; custom dashboards. |
+| Box office staff | STAFF | Query sales and their status. |
+| External integrator | Depends on key | Build automations on top of the API without touching the dashboard. |
 
-## 4. Objetivos y métricas de éxito
+## 4. Goals and success metrics
 
-- **O1 — Adopción:** un operador puede pasar de `npm i -g` a `ft whoami` en < 2 min.
-- **O2 — Cobertura de lectura:** 100% de los endpoints `GET` de la API expuestos como comando.
-- **O3 — Sincronía:** 0 drift entre el CLI publicado y el `openapi.json` del backend
-  (garantizado por codegen + typecheck en CI).
-- **O4 — Scriptabilidad:** toda salida disponible en `--json` parseable, stdout limpio.
+- **O1 — Adoption:** an operator can go from `npm i -g` to `ft whoami` in < 2 min.
+- **O2 — Read coverage:** 100% of API `GET` endpoints are exposed as commands.
+- **O3 — Sync:** 0 drift between the published CLI and the backend `openapi.json`
+  (guaranteed by codegen + typecheck in CI).
+- **O4 — Scriptability:** every output is available through parseable `--json`, with clean stdout.
 
-Métrica norte: **comandos ejecutados / semana** por workspace activo.
+North-star metric: **commands run / week** per active workspace.
 
-## 5. Alcance
+## 5. Scope
 
-### Fase 1 — Lecturas ✅ (publicada)
+### Phase 1 — Reads ✅ (published)
 
-| Capacidad | Estado |
+| Capability | Status |
 |---|---|
-| Autenticación por API key (`login`/`whoami`/`logout`/`config`) | ✅ |
+| API key authentication (`login`/`whoami`/`logout`/`config`) | ✅ |
 | `events list|get` | ✅ |
 | `ticket-types list|get` (`--event-date-id`) | ✅ |
 | `sales list|get` (`--status`) | ✅ |
@@ -64,76 +64,76 @@ Métrica norte: **comandos ejecutados / semana** por workspace activo.
 | `reports summary` (`--period`) | ✅ |
 | `reports export buyers|subscribers` | ✅ |
 | Flags `--json` / `--workspace` / `--limit` / `--cursor` | ✅ |
-| Banner ASCII amarillo de marca | ✅ |
-| Config `~/.freeticket/config.json` (0600) + env vars | ✅ |
-| Cliente generado desde OpenAPI + sync script | ✅ |
-| Subagentes de revisión/integración + CI + release a npm | ✅ |
+| Yellow brand ASCII banner | ✅ |
+| `~/.freeticket/config.json` config (0600) + env vars | ✅ |
+| Client generated from OpenAPI + sync script | ✅ |
+| Review/integration subagents + CI + npm release | ✅ |
 
-### Fase 2 — Escrituras 🟡 (en diseño)
+### Phase 2 — Writes 🟡 (in design)
 
-Habilitar los `POST/PATCH/DELETE` que hoy responden `501`. Depende de que el
-**backend** extraiga la lógica de los Server Actions a servicios puros que tomen
-`{ organizationId, userId, role }`. Orden propuesto por riesgo creciente:
+Enable the `POST/PATCH/DELETE` endpoints that return `501` today. This depends on
+the **backend** extracting Server Action logic into pure services that accept
+`{ organizationId, userId, role }`. Proposed order by increasing risk:
 
-1. 🟡 `events publish` + `events update` (cambios de metadata, bajo riesgo).
-2. 🟡 `ticket-types create|update` y `event-dates create|update`.
+1. 🟡 `events publish` + `events update` (metadata changes, low risk).
+2. 🟡 `ticket-types create|update` and `event-dates create|update`.
 3. 🟡 `venues create|update`, `plans create|update`.
-4. 🟡 `staff invite` + `staff role` (toca permisos — requiere confirmaciones).
-5. 🟡 `sales cancel|refund` (toca proveedor de pago — máxima cautela).
+4. 🟡 `staff invite` + `staff role` (touches permissions, requires confirmations).
+5. 🟡 `sales cancel|refund` (touches payment provider, maximum caution).
 
-### Fuera de alcance ⛔
+### Out of scope ⛔
 
-- **Checkout / creación de ventas** (stock + pago + reservas): vive en el flujo web.
-- **Creación compleja de eventos** (plantillas + invitación de artistas).
-- **Refunds que toquen el PSP** sin un servicio idempotente dedicado del backend.
-- Gestión de membresías de fans (Stripe) y cualquier flujo B2C.
+- **Checkout / sale creation** (stock + payment + reservations): remains in the web flow.
+- **Complex event creation** (templates + artist invitations).
+- **Refunds that touch the PSP** without a dedicated idempotent backend service.
+- Fan membership management (Stripe) and any B2C flow.
 
-## 6. Requisitos funcionales
+## 6. Functional requirements
 
-- **RF1** El CLI resuelve config con precedencia `flags > env > ~/.freeticket/config.json > defaults`.
-- **RF2** Cada llamada inyecta `Authorization: Bearer` + `X-Workspace-Id` (si hay workspace).
-- **RF3** Listados paginan por cursor; la pista `--cursor` se imprime en **stderr**.
-- **RF4** Errores de la API (`{error:{code,message,details}}`) se traducen a mensajes
-  accionables y salen con código `1`. Códigos cubiertos: 401/403/404/422/501/500.
-- **RF5** `--json` vuelca JSON crudo a **stdout** sin contaminación (banner/pistas a stderr).
-- **RF6** `ft` sin comando muestra banner + ayuda; `ft --version` reporta la versión del paquete.
+- **FR1** The CLI resolves config with `flags > env > ~/.freeticket/config.json > defaults` precedence.
+- **FR2** Every call injects `Authorization: Bearer` + `X-Workspace-Id` (when a workspace exists).
+- **FR3** Lists paginate by cursor; the `--cursor` hint is printed to **stderr**.
+- **FR4** API errors (`{error:{code,message,details}}`) are translated into
+  actionable messages and exit with code `1`. Covered codes: 401/403/404/422/501/500.
+- **FR5** `--json` dumps raw JSON to **stdout** without contamination (banner/hints to stderr).
+- **FR6** `ft` with no command shows banner + help; `ft --version` reports the package version.
 
-## 7. Requisitos no funcionales
+## 7. Non-functional requirements
 
-- **RNF1 — Seguridad:** la API key se guarda con modo `0600` y nunca se loguea ni se
-  imprime sin enmascarar; no se commitea jamás.
-- **RNF2 — Sincronía:** `src/client/` es generado y gitignored; CI lo regenera y el
-  typecheck falla si un `operationId` desaparece.
-- **RNF3 — Portabilidad:** Node ≥ 20; binario ESM con shebang; instalable por npm/npx.
-- **RNF4 — Mantenibilidad:** comandos de recurso comparten un único factory (`resource.ts`).
-- **RNF5 — Versionado:** SemVer; la versión del CLI NO sigue la de la API (`/api/v1`).
+- **NFR1 — Security:** the API key is stored with mode `0600`, is never logged,
+  is never printed unmasked, and is never committed.
+- **NFR2 — Sync:** `src/client/` is generated and gitignored; CI regenerates it,
+  and typecheck fails if an `operationId` disappears.
+- **NFR3 — Portability:** Node >= 20; ESM binary with shebang; installable through npm/npx.
+- **NFR4 — Maintainability:** resource commands share a single factory (`resource.ts`).
+- **NFR5 — Versioning:** SemVer; the CLI version does not track the API version (`/api/v1`).
 
-## 8. Arquitectura (resumen)
+## 8. Architecture (summary)
 
-`openapi.json` (contrato commiteado) → `@hey-api/openapi-ts` genera `src/client/` →
-comandos `commander` en `src/commands/` que inyectan headers desde `src/lib/config.ts`,
-desempaquetan con `src/lib/api.ts` (`unwrap`) e imprimen con `src/lib/output.ts`.
-Detalle en el [README](../README.md).
+`openapi.json` (committed contract) → `@hey-api/openapi-ts` generates `src/client/` →
+`commander` commands in `src/commands/` inject headers from `src/lib/config.ts`,
+unwrap with `src/lib/api.ts` (`unwrap`), and print through `src/lib/output.ts`.
+Details in the [README](../README.md).
 
-## 9. Release y operación
+## 9. Release and operations
 
-- CI (`ci.yml`): lint + typecheck + test + build en cada PR y push a `main`.
-- Release (`release.yml`): `npm publish` disparado por tag `v*` (secret `NPM_TOKEN`).
-- Sync con backend: `pnpm sync-openapi` baja el spec y regenera; el diff de
-  `openapi.json` documenta el cambio de contrato.
+- CI (`ci.yml`): lint + typecheck + test + build on every PR and push to `main`.
+- Release (`release.yml`): `npm publish` triggered by `v*` tags (`NPM_TOKEN` secret).
+- Backend sync: `pnpm sync-openapi` downloads the spec and regenerates; the
+  `openapi.json` diff documents the contract change.
 
-## 10. Riesgos
+## 10. Risks
 
-| Riesgo | Mitigación |
+| Risk | Mitigation |
 |---|---|
-| Breaking change del backend rompe el CLI en silencio | Codegen + typecheck en CI; agente `openapi-sync` clasifica el diff. |
-| Fuga de la API key | Modo `0600`, enmascarado en `config`, nunca en logs ni git. |
-| Escrituras (fase 2) con efectos colaterales (pagos) | Bloqueadas hasta que el backend exponga servicios idempotentes; orden por riesgo. |
-| Drift entre versión publicada y contrato | `openapi.json` commiteado como fuente de verdad; release siempre regenera. |
+| Backend breaking change silently breaks the CLI | Codegen + typecheck in CI; `openapi-sync` agent classifies the diff. |
+| API key leak | `0600` mode, masked in `config`, never in logs or git. |
+| Write operations (phase 2) with side effects (payments) | Blocked until the backend exposes idempotent services; ordered by risk. |
+| Drift between published version and contract | `openapi.json` committed as source of truth; release always regenerates. |
 
 ## 11. Roadmap
 
-- ✅ **v0.1** — Fase 1 (lecturas) publicada.
-- 🟡 **v0.2** — Calidad: tests por comando, `ft --help` rico, mejoras de tabla/salida.
-- 🟡 **v0.3+** — Fase 2 escrituras, endpoint por endpoint según §5, detrás de confirmaciones.
-- 🔮 **futuro** — autocompletado de shell, `ft open` (deep-link al dashboard), output a CSV nativo.
+- ✅ **v0.1** — Phase 1 (reads) published.
+- 🟡 **v0.2** — Quality: command tests, richer `ft --help`, table/output improvements.
+- 🟡 **v0.3+** — Phase 2 writes, endpoint by endpoint according to §5, behind confirmations.
+- 🔮 **future** — shell completion, `ft open` (dashboard deep link), native CSV output.
