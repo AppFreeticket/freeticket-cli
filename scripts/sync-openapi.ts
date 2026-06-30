@@ -1,11 +1,12 @@
 // Downloads the backend OpenAPI contract and regenerates the client.
-//   FT_OPENAPI_URL=https://admin.appfreeticket.com/api/v1/openapi.json pnpm sync-openapi
+// Defaults to production; point at a local backend with:
+//   FT_OPENAPI_URL=http://admin.localhost:3000/api/v1/openapi.json pnpm sync-openapi
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
 const url =
   process.env.FT_OPENAPI_URL ??
-  "http://admin.localhost:3000/api/v1/openapi.json";
+  "https://admin.appfreeticket.com/api/v1/openapi.json";
 
 const res = await fetch(url);
 if (!res.ok) {

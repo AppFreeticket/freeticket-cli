@@ -5,6 +5,14 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Self-service browser login:** `ft login` (no `--key`) now runs the OAuth 2.0
+  Device Authorization Grant (RFC 8628) — prints a code, opens the browser, polls
+  until you approve, and stores the minted session. Anyone with a FreeTicket
+  account can log in without a backend-issued API key. `ft login --key ft_live_…`
+  stays for headless CI. Consumes `POST /auth/device/code` + `POST /auth/device/token`
+  (free-admin#160).
+
 ## [0.4.0] - 2026-06-29
 
 ### Added
