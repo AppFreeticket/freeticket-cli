@@ -1,3 +1,4 @@
+import { client as adminClient } from "../admin-client/client.gen";
 import { client } from "../client/client.gen";
 import { loadConfig } from "./config";
 
@@ -16,6 +17,29 @@ export function configureClient(workspaceOverride?: string): void {
     headers: {
       Authorization: `Bearer ${cfg.apiKey}`,
       ...(workspaceId ? { "X-Workspace-Id": workspaceId } : {}),
+    },
+  });
+}
+
+/**
+ * Configures the superadmin client (/api/admin). Auth is a better-auth session
+ * cookie of a SUPER_ADMIN — NOT an API key (the admin contract issues no keys).
+ * MVP: paste the session token via FT_ADMIN_SESSION; converges to a service
+ * token once the backend ships it (see free-admin#157).
+ * ponytail: cookie header until the Bearer service-token lands.
+ */
+export function configureAdminClient(): void {
+  const cfg = loadConfig();
+  if (!cfg.adminSession) {
+    fail(
+      "No superadmin session. Export FT_ADMIN_SESSION with a SUPER_ADMIN better-auth session token.",
+      "Log in to the admin panel in your browser and copy the `better-auth.session_token` cookie.",
+    );
+  }
+  adminClient.setConfig({
+    baseUrl: `${cfg.apiUrl.replace(/\/$/, "")}/api/admin`,
+    headers: {
+      Cookie: `better-auth.session_token=${cfg.adminSession}`,
     },
   });
 }

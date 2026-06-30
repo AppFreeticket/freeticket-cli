@@ -12,9 +12,10 @@ if (!res.ok) {
   console.error(`Could not download the spec (${res.status}) from ${url}`);
   process.exit(1);
 }
+const out = process.env.FT_OPENAPI_OUT ?? "openapi.json";
 const spec = await res.json();
-writeFileSync("openapi.json", `${JSON.stringify(spec, null, 2)}\n`);
-console.log(`✓ openapi.json updated from ${url}`);
+writeFileSync(out, `${JSON.stringify(spec, null, 2)}\n`);
+console.log(`✓ ${out} updated from ${url}`);
 
 execSync("pnpm generate", { stdio: "inherit" });
-console.log("✓ client regenerated in src/client/");
+console.log("✓ clients regenerated in src/client/ + src/admin-client/");

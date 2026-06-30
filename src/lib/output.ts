@@ -32,6 +32,25 @@ export function print(data: unknown, opts: PrintOpts = {}): void {
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
 }
 
+/**
+ * Serializes an array of flat rows to CSV (RFC 4180 quoting). Columns default
+ * to the first row's keys. Objects/arrays in cells are JSON-stringified.
+ */
+export function toCsv(rows: unknown, columns?: string[]): string {
+  if (!Array.isArray(rows) || rows.length === 0) return "";
+  const cols = columns ?? Object.keys(rows[0] as object);
+  const esc = (v: unknown): string => {
+    if (v === null || v === undefined) return "";
+    const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const head = cols.map(esc).join(",");
+  const body = (rows as Record<string, unknown>[]).map((r) =>
+    cols.map((c) => esc(r[c])).join(","),
+  );
+  return [head, ...body].join("\n");
+}
+
 /** Pagination hint on stderr to avoid contaminating `--json` output. */
 export function printNextCursor(page?: { nextCursor?: string | null }): void {
   if (page?.nextCursor) {

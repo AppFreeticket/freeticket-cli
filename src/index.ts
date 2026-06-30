@@ -2,8 +2,14 @@ import { Command } from "commander";
 // Version synced with package.json at build time (tsup injects it via import).
 import pkg from "../package.json" with { type: "json" };
 import {
+  deleteEventsId,
+  deleteEventsIdDatesDateId,
+  deleteMembershipPlansId,
+  deleteTicketTypesId,
+  deleteVenuesId,
   getEvents,
   getEventsId,
+  getEventsIdDates,
   getMembershipPlans,
   getMembershipPlansId,
   getSales,
@@ -13,8 +19,25 @@ import {
   getTicketTypesId,
   getVenues,
   getVenuesId,
+  patchEventsId,
+  patchEventsIdDatesDateId,
+  patchMembershipPlansId,
+  patchStaffIdRole,
+  patchTicketTypesId,
+  patchVenuesId,
+  postEvents,
+  postEventsIdDates,
+  postEventsIdPublish,
+  postMembershipPlans,
+  postSalesIdCancel,
+  postSalesIdRefund,
+  postStaff,
+  postTicketTypes,
+  postVenues,
 } from "./client/sdk.gen";
+import { registerAdmin } from "./commands/admin";
 import { registerAuth } from "./commands/auth";
+import { registerEventDates } from "./commands/event-dates";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { banner } from "./lib/banner";
@@ -34,7 +57,20 @@ registerResource(program, {
   describe: "Events",
   list: getEvents,
   get: getEventsId,
+  create: postEvents,
+  update: patchEventsId,
+  del: deleteEventsId,
+  actions: [
+    { name: "publish", describe: "Publish an event", fn: postEventsIdPublish },
+  ],
   columns: ["id", "name", "status", "startsAt"],
+});
+
+registerEventDates(program, {
+  list: getEventsIdDates,
+  create: postEventsIdDates,
+  update: patchEventsIdDatesDateId,
+  del: deleteEventsIdDatesDateId,
 });
 
 registerResource(program, {
@@ -42,6 +78,15 @@ registerResource(program, {
   describe: "Sales",
   list: getSales,
   get: getSalesId,
+  actions: [
+    { name: "cancel", describe: "Cancel a sale", fn: postSalesIdCancel },
+    {
+      name: "refund",
+      describe: "Refund a sale (--data for partial amount)",
+      fn: postSalesIdRefund,
+      body: true,
+    },
+  ],
   columns: ["id", "reference", "status", "total", "currency", "createdAt"],
   listFlags: [
     { flag: "--status <s>", describe: "filter by status", query: "status" },
@@ -53,6 +98,9 @@ registerResource(program, {
   describe: "Ticket types",
   list: getTicketTypes,
   get: getTicketTypesId,
+  create: postTicketTypes,
+  update: patchTicketTypesId,
+  del: deleteTicketTypesId,
   columns: ["id", "name", "price", "currency", "stock"],
   listFlags: [
     {
@@ -68,6 +116,9 @@ registerResource(program, {
   describe: "Membership plans",
   list: getMembershipPlans,
   get: getMembershipPlansId,
+  create: postMembershipPlans,
+  update: patchMembershipPlansId,
+  del: deleteMembershipPlansId,
   columns: ["id", "name", "price", "currency", "interval"],
 });
 
@@ -76,6 +127,9 @@ registerResource(program, {
   describe: "Venues",
   list: getVenues,
   get: getVenuesId,
+  create: postVenues,
+  update: patchVenuesId,
+  del: deleteVenuesId,
   columns: ["id", "name", "city"],
 });
 
@@ -83,10 +137,20 @@ registerResource(program, {
   name: "staff",
   describe: "Workspace staff",
   list: getStaff,
+  create: postStaff,
+  actions: [
+    {
+      name: "set-role",
+      describe: 'Change a staff member\'s role (--data \'{"role":"..."}\')',
+      fn: patchStaffIdRole,
+      body: true,
+    },
+  ],
   columns: ["id", "name", "email", "role"],
 });
 
 registerReports(program);
+registerAdmin(program);
 
 // No arguments -> banner + help.
 if (process.argv.length <= 2) {

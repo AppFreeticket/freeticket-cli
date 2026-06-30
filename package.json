@@ -1,8 +1,14 @@
 {
   "name": "@freeticket/cli",
-  "version": "0.1.1",
+  "version": "0.4.0",
   "description": "Official FreeTicket CLI — consumes the B2B REST API for events, sales, tickets, memberships, venues, staff, and reports.",
-  "keywords": ["freeticket", "cli", "ticketing", "events", "api"],
+  "keywords": [
+    "freeticket",
+    "cli",
+    "ticketing",
+    "events",
+    "api"
+  ],
   "homepage": "https://github.com/AppFreeticket/freeticket-cli#readme",
   "bugs": "https://github.com/AppFreeticket/freeticket-cli/issues",
   "repository": {
@@ -16,7 +22,9 @@
   "bin": {
     "ft": "dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -26,8 +34,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "generate": "openapi-ts",
+    "generate": "openapi-ts && openapi-ts -f openapi-ts.admin.config.ts",
     "sync-openapi": "tsx scripts/sync-openapi.ts",
+    "sync-openapi:admin": "FT_OPENAPI_URL=${FT_ADMIN_OPENAPI_URL:-https://admin.appfreeticket.com/api/admin/openapi.json} FT_OPENAPI_OUT=admin-openapi.json tsx scripts/sync-openapi.ts",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
