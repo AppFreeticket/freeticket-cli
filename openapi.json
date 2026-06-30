@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket B2B API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "API REST B2B de FreeTicket para integraciones y el CLI. Autenticación por API key (header `Authorization: Bearer <key>` o `x-api-key`); el workspace activo se selecciona con el header `X-Workspace-Id`."
   },
   "servers": [
@@ -16,6 +16,82 @@
     }
   ],
   "paths": {
+    "/auth/device/code": {
+      "post": {
+        "operationId": "postAuthDeviceCode",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Inicia el Device Authorization Grant (RFC 8628)",
+        "description": "Endpoint público (sin auth): bootstrap de credenciales del Device Authorization Grant (RFC 8628).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Flujo iniciado: device_code (lo poll-ea el CLI) + user_code (lo aprueba el usuario en el browser).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodeResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP (anti-flood).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/device/token": {
+      "post": {
+        "operationId": "postAuthDeviceToken",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Poll del CLI: canjea el device_code por una API key al aprobar",
+        "description": "Endpoint público (sin auth): bootstrap de credenciales del Device Authorization Grant (RFC 8628).",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aprobado: entrega la API key ft_live_… una sola vez y consume la fila.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Estado RFC 8628: authorization_pending | slow_down | expired_token | access_denied | invalid_request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me": {
       "get": {
         "operationId": "getMe",
@@ -3460,6 +3536,130 @@
           "role",
           "activeWorkspaceId",
           "workspaces"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceCodeResponse": {
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": "string"
+          },
+          "user_code": {
+            "type": "string"
+          },
+          "verification_uri": {
+            "type": "string"
+          },
+          "verification_uri_complete": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_uri",
+          "verification_uri_complete",
+          "expires_in",
+          "interval"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceTokenRequest": {
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "grant_type": {
+            "type": "string",
+            "const": "urn:ietf:params:oauth:grant-type:device_code"
+          }
+        },
+        "required": [
+          "device_code"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceTokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "Bearer"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "SUPER_ADMIN",
+                  "ADMIN",
+                  "STAFF",
+                  "VIEWER",
+                  "MINCULTURA"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "role"
+            ],
+            "additionalProperties": false
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            }
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "user",
+          "workspaces"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceTokenError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "authorization_pending",
+              "slow_down",
+              "expired_token",
+              "access_denied",
+              "invalid_request"
+            ]
+          }
+        },
+        "required": [
+          "error"
         ],
         "additionalProperties": false
       },

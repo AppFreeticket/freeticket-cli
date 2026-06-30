@@ -51,17 +51,17 @@ ft --version
 ## Quickstart
 
 ```bash
-# 1. Issue an API key in the backend (server side):
-#    pnpm api:key you@example.com
-#    -> returns an ft_live_xxxxx key (shown only once)
+# 1. Log in through the browser (OAuth device flow). Prints a code, opens your
+#    browser, you approve, and the session is stored in ~/.freeticket/config.json.
+ft login
 
-# 2. Log in (stores the key in ~/.freeticket/config.json and verifies it)
-ft login --key ft_live_xxxxx
+# CI / automation: skip the browser with a backend-issued key instead.
+#   ft login --key ft_live_xxxxx
 
-# 3. Who am I, and which workspaces can I access?
+# 2. Who am I, and which workspaces can I access?
 ft whoami
 
-# 4. Start exploring
+# 3. Start exploring
 ft events list
 ft reports summary --period 30d
 ft sales list --status CONFIRMED --json
@@ -71,7 +71,7 @@ ft sales list --status CONFIRMED --json
 
 | Command | What it does | Minimum role |
 |---|---|---|
-| `ft login --key <key>` | Stores and verifies your API key | VIEWER |
+| `ft login` | Browser login (device flow); `--key <key>` for CI | VIEWER |
 | `ft whoami` | Active user and accessible workspaces | VIEWER |
 | `ft config` · `ft logout` | Show config (masked key) · remove key | — |
 | `ft events list` · `get <id>` | Workspace events | VIEWER |
@@ -170,7 +170,7 @@ CLI QA, and release/devops. See the [agents README](./.claude/agents/README.md).
 ## Requirements
 
 - Node.js **>= 20**
-- A FreeTicket API key (`ft_live_...`)
+- A FreeTicket account (`ft login` opens the browser; no API key needed)
 
 ## License
 
