@@ -10,19 +10,46 @@ import {
   getUsersId,
   getWorkspaces,
   getWorkspacesId,
+  patchPlatformPlansId,
+  patchUsersId,
+  patchWorkspacesId,
+  postImpersonate,
+  postImpersonateStop,
+  postPlatformPlans,
+  postWorkspaces,
+  postWorkspacesIdRestore,
+  postWorkspacesIdSuspend,
+  putFeatureFlagsKey,
 } from "../admin-client/sdk.gen";
 import { configureAdminClient, unwrap } from "../lib/api";
-import { print, printNextCursor } from "../lib/output";
+import { confirm, parseData } from "../lib/input";
+import { print, printNextCursor, toCsv } from "../lib/output";
 
 type SdkFn = (
   opts: any,
 ) => Promise<{ data?: any; error?: unknown; response: Response }>;
+
+/** Id-bound (or key-bound) custom mutation, e.g. workspaces suspend. */
+interface AdminAction {
+  name: string;
+  describe: string;
+  fn: SdkFn;
+  /** Accepts a --data JSON body. */
+  body?: boolean;
+  /** Path param name (default "id"; feature-flags use "key"). */
+  param?: string;
+  /** Confirm before running (destructive). */
+  confirm?: boolean;
+}
 
 interface AdminResource {
   name: string;
   describe: string;
   list?: SdkFn;
   get?: SdkFn;
+  create?: SdkFn;
+  update?: SdkFn;
+  actions?: AdminAction[];
   columns?: string[];
   /** Extra list flags -> query entries. */
   listFlags?: { flag: string; describe: string; query: string }[];
@@ -32,8 +59,8 @@ interface AdminResource {
 
 /**
  * Superadmin commands (`ft admin <resource>`) against the /api/admin contract.
- * Read-only first pass — writes (suspend/restore/patch, impersonate,
- * feature-flags put) come in a second pass behind confirmation.
+ * Reads + writes (create/update, suspend/restore, feature-flag set,
+ * impersonate) behind confirmation on destructive ops.
  * Auth is a SUPER_ADMIN session, not an API key (see configureAdminClient).
  */
 export function registerAdmin(program: Command): void {
@@ -51,12 +78,50 @@ export function registerAdmin(program: Command): void {
       print(body.data, { json: opts.json });
     });
 
+  admin
+    .command("impersonate")
+    .description('Start impersonation (--data \'{"targetUserId":"..."}\')')
+    .requiredOption("--data <json>", "JSON body (inline or @file.json)")
+    .option("--json", "raw JSON output")
+    .action(async (opts) => {
+      configureAdminClient();
+      const body = unwrap(
+        await postImpersonate({ body: parseData(opts.data) as never }),
+      );
+      print(body?.data ?? body, { json: opts.json });
+    });
+
+  admin
+    .command("impersonate-stop")
+    .description("Stop the current impersonation")
+    .option("--json", "raw JSON output")
+    .action(async (opts) => {
+      configureAdminClient();
+      const body = unwrap(await postImpersonateStop({}));
+      print(body?.data ?? { ok: true }, { json: opts.json });
+    });
+
   const resources: AdminResource[] = [
     {
       name: "workspaces",
       describe: "Tenants / workspaces",
       list: getWorkspaces,
       get: getWorkspacesId,
+      create: postWorkspaces,
+      update: patchWorkspacesId,
+      actions: [
+        {
+          name: "suspend",
+          describe: "Suspend a workspace",
+          fn: postWorkspacesIdSuspend,
+          confirm: true,
+        },
+        {
+          name: "restore",
+          describe: "Restore a suspended workspace",
+          fn: postWorkspacesIdRestore,
+        },
+      ],
       columns: ["id", "name", "type", "country", "suspended", "createdAt"],
       listFlags: [
         { flag: "--status <s>", describe: "filter by status", query: "status" },
@@ -68,6 +133,7 @@ export function registerAdmin(program: Command): void {
       describe: "Global users (cross-tenant)",
       list: getUsers,
       get: getUsersId,
+      update: patchUsersId,
       columns: ["id", "name", "email", "role", "banned", "createdAt"],
       listFlags: [
         { flag: "--q <text>", describe: "search by name/email", query: "q" },
@@ -84,12 +150,23 @@ export function registerAdmin(program: Command): void {
       describe: "Platform plans",
       list: getPlatformPlans,
       get: getPlatformPlansId,
+      create: postPlatformPlans,
+      update: patchPlatformPlansId,
       columns: ["id", "name", "price", "currency", "interval"],
     },
     {
       name: "feature-flags",
       describe: "Feature flags",
       list: getFeatureFlags,
+      actions: [
+        {
+          name: "set",
+          describe: 'Set a flag (--data \'{"scope":"...","enabled":true}\')',
+          fn: putFeatureFlagsKey,
+          body: true,
+          param: "key",
+        },
+      ],
       columns: ["key", "enabled", "description"],
       noPaging: true,
     },
@@ -112,6 +189,7 @@ export function registerAdmin(program: Command): void {
 
 function registerAdminResource(parent: Command, spec: AdminResource): void {
   const root = parent.command(spec.name).description(spec.describe);
+  const singular = spec.name.replace(/s$/, "");
 
   if (spec.list) {
     const list = spec.list;
@@ -122,6 +200,7 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
         .option("--cursor <id>", "pagination cursor");
     }
     for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
+    cmd.option("--csv", "CSV output");
     cmd.option("--json", "raw JSON output");
     cmd.action(async (opts) => {
       configureAdminClient();
@@ -135,6 +214,10 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
         if (v !== undefined) query[f.query] = v;
       }
       const body = unwrap(await list({ query }));
+      if (opts.csv) {
+        process.stdout.write(`${toCsv(body.data, spec.columns)}\n`);
+        return;
+      }
       print(body.data, { json: opts.json, columns: spec.columns });
       if (!opts.json && !spec.noPaging) printNextCursor(body.page);
     });
@@ -144,13 +227,70 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
     const get = spec.get;
     root
       .command("get <id>")
-      .description(`Get one ${spec.name.replace(/s$/, "")} by id`)
+      .description(`Get one ${singular} by id`)
       .option("--json", "raw JSON output")
       .action(async (id, opts) => {
         configureAdminClient();
         const body = unwrap(await get({ path: { id } }));
         print(body.data, { json: opts.json });
       });
+  }
+
+  if (spec.create) {
+    const create = spec.create;
+    root
+      .command("create")
+      .description(`Create a ${singular}`)
+      .requiredOption("--data <json>", "JSON body (inline or @file.json)")
+      .option("--json", "raw JSON output")
+      .action(async (opts) => {
+        configureAdminClient();
+        const body = unwrap(await create({ body: parseData(opts.data) }));
+        print(body?.data ?? body, { json: opts.json });
+      });
+  }
+
+  if (spec.update) {
+    const update = spec.update;
+    root
+      .command("update <id>")
+      .description(`Update a ${singular} by id`)
+      .requiredOption("--data <json>", "JSON body (inline or @file.json)")
+      .option("--json", "raw JSON output")
+      .action(async (id, opts) => {
+        configureAdminClient();
+        const body = unwrap(
+          await update({ path: { id }, body: parseData(opts.data) }),
+        );
+        print(body?.data ?? body, { json: opts.json });
+      });
+  }
+
+  for (const action of spec.actions ?? []) {
+    const param = action.param ?? "id";
+    const cmd = root
+      .command(`${action.name} <${param}>`)
+      .description(action.describe)
+      .option("--yes", "skip confirmation")
+      .option("--json", "raw JSON output");
+    if (action.body) {
+      cmd.option("--data <json>", "JSON body (inline or @file.json)");
+    }
+    cmd.action(async (value, opts) => {
+      if (
+        action.confirm &&
+        !opts.yes &&
+        !(await confirm(`${action.name} ${singular} ${value}?`))
+      ) {
+        console.error("Aborted.");
+        return;
+      }
+      configureAdminClient();
+      const payload: Record<string, unknown> = { path: { [param]: value } };
+      if (action.body && opts.data) payload.body = parseData(opts.data);
+      const body = unwrap(await action.fn(payload));
+      print(body?.data ?? body ?? { ok: true }, { json: opts.json });
+    });
   }
 }
 

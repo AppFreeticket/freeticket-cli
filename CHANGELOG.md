@@ -5,6 +5,24 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-29
+
+### Added
+- **Write layer (B2B v1):** every resource now has `create`/`update`/`delete`
+  plus resource actions — `events publish`, `sales cancel`/`refund`,
+  `staff create`/`set-role`. Bodies via `--data` (inline JSON or `@file.json`);
+  `delete` confirms unless `--yes`.
+- `event-dates` command group for the nested `/events/{id}/dates` resource
+  (`list`/`create <eventId>`, `update`/`delete <eventId> <dateId>`).
+- **Admin writes:** `workspaces create`/`update`/`suspend`/`restore`,
+  `users update`, `plans create`/`update`, `feature-flags set <key>`,
+  `impersonate`/`impersonate-stop`.
+- **`--csv`** flag on every list command (B2B + admin) — CSV on stdout for
+  spreadsheets/accounting, columns matching the table view.
+- `lib/input.ts`: `parseData` (`--data` inline/`@file` JSON) and an interactive
+  `confirm` for destructive ops (auto-aborts on non-TTY stdin).
+- `toCsv` (RFC 4180 quoting) in `lib/output.ts`.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added
