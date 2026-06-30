@@ -6,6 +6,8 @@ export interface FtConfig {
   apiUrl: string;
   apiKey?: string;
   workspaceId?: string;
+  /** Superadmin (/api/admin): better-auth session token of a SUPER_ADMIN. */
+  adminSession?: string;
 }
 
 const CONFIG_DIR = join(homedir(), ".freeticket");
@@ -31,6 +33,7 @@ export function loadConfig(): FtConfig {
     apiUrl: process.env.FT_API_URL ?? file.apiUrl ?? DEFAULT_API_URL,
     apiKey: process.env.FT_API_KEY ?? file.apiKey,
     workspaceId: process.env.FT_WORKSPACE_ID ?? file.workspaceId,
+    adminSession: process.env.FT_ADMIN_SESSION ?? file.adminSession,
   };
 }
 

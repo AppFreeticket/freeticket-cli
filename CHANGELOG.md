@@ -5,6 +5,26 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-29
+
+### Added
+- Superadmin commands (`ft admin …`) against the separate `/api/admin` contract
+  (Admin API v1.0.0): `me`, `workspaces`, `users`, `plans`, `feature-flags`,
+  `audit-log` (read-only first pass).
+- Second generated client (`src/admin-client/`) via `openapi-ts.admin.config.ts`,
+  with its own `client` singleton and auth.
+- `configureAdminClient` using a SUPER_ADMIN better-auth session
+  (`FT_ADMIN_SESSION`) — the admin contract issues no API key.
+- `sync-openapi:admin` script (target `FT_ADMIN_OPENAPI_URL`); `generate` now
+  builds both the B2B and admin clients.
+
+## [0.2.0] - 2026-06-29
+
+### Added
+- CFO financial reconciliation against B2B contract v1.1.0:
+  `ft reports reconciliation` and `ft reports export reconciliation` — cross
+  Mercado Pago payment, sale and Siigo invoice with a `match_status` per sale.
+
 ## [0.1.1] - 2026-06-25
 
 ### Changed

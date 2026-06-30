@@ -1,8 +1,9 @@
 node_modules/
 dist/
 .npm-cache/
-# client generated from openapi.json — regenerated with `pnpm generate`
+# clients generated from the specs — regenerated with `pnpm generate`
 src/client/
+src/admin-client/
 *.log
 .DS_Store
 .env

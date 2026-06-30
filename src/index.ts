@@ -14,6 +14,7 @@ import {
   getVenues,
   getVenuesId,
 } from "./client/sdk.gen";
+import { registerAdmin } from "./commands/admin";
 import { registerAuth } from "./commands/auth";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
@@ -87,6 +88,7 @@ registerResource(program, {
 });
 
 registerReports(program);
+registerAdmin(program);
 
 // No arguments -> banner + help.
 if (process.argv.length <= 2) {
