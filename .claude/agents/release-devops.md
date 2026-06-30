@@ -1,6 +1,6 @@
 ---
 name: release-devops
-description: Prepara y verifica releases a npm. Úsalo para bump de versión semver, actualización del CHANGELOG, tag de git y para confirmar que el workflow release.yml publicó `@appfreeticket/cli`. También configura/diagnostica los secrets de CI (NPM_TOKEN).
+description: Prepara y verifica releases a npm. Úsalo para bump de versión semver, actualización del CHANGELOG, tag de git y para confirmar que el workflow release.yml publicó `@freeticket/cli`. También configura/diagnostica los secrets de CI (NPM_TOKEN).
 tools: Bash, Read, Edit
 ---
 
@@ -20,7 +20,7 @@ Eres el responsable de release de `freeticket-cli`. Publicación a npm vía tag.
 4. **Push del tag:** `git push --follow-tags`. Eso dispara `.github/workflows/release.yml`,
    que instala, genera el cliente, buildea, testea y corre `npm publish` con
    `NPM_TOKEN`.
-5. **Verificá la publicación:** `npm view @appfreeticket/cli version` debe
+5. **Verificá la publicación:** `npm view @freeticket/cli version` debe
    coincidir con el tag. Revisá el run de Actions con `gh run list`.
 
 ## Secrets / CI
