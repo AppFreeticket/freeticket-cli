@@ -40,6 +40,7 @@ import { registerAuth } from "./commands/auth";
 import { registerEventDates } from "./commands/event-dates";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
+import { registerWorkspace } from "./commands/workspace";
 import { banner } from "./lib/banner";
 
 const program = new Command();
@@ -51,6 +52,7 @@ program
   .addHelpText("beforeAll", banner());
 
 registerAuth(program);
+registerWorkspace(program);
 
 registerResource(program, {
   name: "events",
@@ -63,7 +65,8 @@ registerResource(program, {
   actions: [
     { name: "publish", describe: "Publish an event", fn: postEventsIdPublish },
   ],
-  columns: ["id", "name", "status", "startsAt"],
+  // startsAt lives on EventDate, not Event — use createdAt for a temporal column.
+  columns: ["id", "name", "status", "createdAt"],
 });
 
 registerEventDates(program, {
@@ -101,7 +104,7 @@ registerResource(program, {
   create: postTicketTypes,
   update: patchTicketTypesId,
   del: deleteTicketTypesId,
-  columns: ["id", "name", "price", "currency", "stock"],
+  columns: ["id", "name", "price", "currency", "capacity"],
   listFlags: [
     {
       flag: "--event-date-id <id>",
@@ -119,7 +122,7 @@ registerResource(program, {
   create: postMembershipPlans,
   update: patchMembershipPlansId,
   del: deleteMembershipPlansId,
-  columns: ["id", "name", "price", "currency", "interval"],
+  columns: ["id", "name", "price", "currency", "billingCycle"],
 });
 
 registerResource(program, {

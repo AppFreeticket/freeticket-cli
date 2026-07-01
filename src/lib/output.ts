@@ -51,6 +51,25 @@ export function toCsv(rows: unknown, columns?: string[]): string {
   return [head, ...body].join("\n");
 }
 
+/**
+ * Resolves which columns to render for a list command.
+ * `--full` shows every field (inferred from the row); `--columns a,b,c` picks
+ * an explicit set; otherwise the resource's curated default is used.
+ */
+export function resolveColumns(
+  opts: { columns?: string; full?: boolean },
+  fallback?: string[],
+): string[] | undefined {
+  if (opts.full) return undefined;
+  if (opts.columns) {
+    return opts.columns
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+  }
+  return fallback;
+}
+
 /** Pagination hint on stderr to avoid contaminating `--json` output. */
 export function printNextCursor(page?: { nextCursor?: string | null }): void {
   if (page?.nextCursor) {

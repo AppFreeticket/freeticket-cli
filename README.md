@@ -61,7 +61,11 @@ ft login
 # 2. Who am I, and which workspaces can I access?
 ft whoami
 
-# 3. Start exploring
+# 3. Pick the workspace you want to operate on (persisted locally).
+ft workspace list
+ft workspace use my-workspace-slug
+
+# 4. Start exploring
 ft events list
 ft reports summary --period 30d
 ft sales list --status CONFIRMED --json
@@ -74,17 +78,26 @@ ft sales list --status CONFIRMED --json
 | `ft login` | Browser login (device flow); `--key <key>` for CI | VIEWER |
 | `ft whoami` | Active user and accessible workspaces | VIEWER |
 | `ft config` · `ft logout` | Show config (masked key) · remove key | — |
+| `ft workspace list` · `use <id\|slug>` · `show` | List, switch, and show the active workspace | VIEWER |
 | `ft events list` · `get <id>` | Workspace events | VIEWER |
+| `ft events create` · `update <id>` · `delete <id>` | Manage events (`--data <json>`) | ADMIN |
+| `ft events publish <id>` | Publish an event | ADMIN |
+| `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
 | `ft ticket-types list` · `get <id>` | Ticket types (`--event-date-id`) | VIEWER |
+| `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
 | `ft sales list` · `get <id>` | Sales (`--status`) | STAFF |
+| `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for partial refund) | ADMIN |
 | `ft plans list` · `get <id>` | Membership plans | VIEWER |
+| `ft plans create` · `update <id>` · `delete <id>` | Manage membership plans (`--data <json>`) | ADMIN |
 | `ft venues list` · `get <id>` | Venues | VIEWER |
-| `ft staff list` | Workspace staff | ADMIN |
+| `ft venues create` · `update <id>` · `delete <id>` | Manage venues (`--data <json>`) | ADMIN |
+| `ft staff list` · `create` · `set-role <id>` | Workspace staff (`--data <json>`) | ADMIN |
 | `ft reports summary` | KPIs (`--period 7d\|30d\|90d\|1y`) | VIEWER |
 | `ft reports export buyers\|subscribers` | Export buyers / subscribers | ADMIN |
 
-> **Write operations** (create/update/delete) are declared in the contract but
-> currently return `501`. They are planned for **phase 2**.
+> **Write operations** (`create`/`update`/`delete` and actions like `publish`,
+> `cancel`, `refund`) send a JSON body via `--data <inline-json>` or
+> `--data @file.json`. `delete` prompts for confirmation unless you pass `--yes`.
 
 ### Common flags
 
@@ -93,6 +106,11 @@ ft sales list --status CONFIRMED --json
 | `--json` | all commands | Raw JSON output, ideal for `jq` and scripts |
 | `--workspace <id>` | all commands | Run the command against another workspace |
 | `--limit <n>` `--cursor <id>` | list commands | Cursor pagination (1-100, default 20) |
+| `--all` | list commands | Auto-paginate: fetch every page (ignores `--cursor`) |
+| `--raw` | list commands | JSON output including the `page` pagination metadata |
+| `--columns <a,b,c>` `--full` | list commands | Pick specific columns · show every field |
+| `--csv` | list commands | CSV output for spreadsheets/accounting |
+| `--data <json>` `--yes` | write commands | JSON body (inline or `@file`) · skip delete confirmation |
 
 ## Configuration
 
@@ -113,8 +131,10 @@ your user can read it) because it stores the API key. See [`.env.example`](./.en
 
 ## Pagination, errors, and money
 
-- **Pagination:** list responses include `page.nextCursor`. The CLI prints the
-  `--cursor <id>` hint to *stderr* so `--json` stays clean on *stdout*.
+- **Pagination:** list responses include `page.nextCursor` / `page.hasMore`. The
+  CLI prints the `--cursor <id>` hint to *stderr* so `--json` stays clean on
+  *stdout*. Use `--all` to auto-paginate every page, or `--raw` to emit the full
+  `{ data, page }` envelope (metadata included) as JSON.
 - **Errors:** uniform format `{ error: { code, message, details } }`. The CLI
   translates `401/403/404/501` into actionable messages and exits with code `1`.
 - **Money:** number in the resource currency (`currency`, usually `COP`).

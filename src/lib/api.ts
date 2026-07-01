@@ -84,7 +84,7 @@ function hintFor(status?: number): string | undefined {
     case 404:
       return "The resource does not exist or belongs to another workspace.";
     case 501:
-      return "Write operation: planned for CLI phase 2.";
+      return "The backend has not implemented this operation yet.";
   }
 }
 
