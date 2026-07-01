@@ -2,7 +2,7 @@
 import type { Command } from "commander";
 import { configureClient, unwrap } from "../lib/api";
 import { confirm, parseData } from "../lib/input";
-import { print, printNextCursor, toCsv } from "../lib/output";
+import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
 
 type SdkFn = (
   opts: any,
@@ -56,12 +56,17 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .description(`List ${spec.name} from the active workspace`)
       .option("--limit <n>", "results per page (1-100)", "20")
       .option("--cursor <id>", "pagination cursor")
+      .option("--all", "auto-paginate: fetch every page (ignores --cursor)")
+      .option("--columns <list>", "comma-separated columns to display")
+      .option("--full", "show every field instead of the curated columns")
       .option("--workspace <id>", "workspace override")
       .option("--csv", "CSV output (for spreadsheets/accounting)")
-      .option("--json", "raw JSON output");
+      .option("--json", "raw JSON output (data only)")
+      .option("--raw", "raw JSON output including pagination metadata (page)");
     for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
     cmd.action(async (opts) => {
       configureClient(opts.workspace);
+      const columns = resolveColumns(opts, spec.columns);
       const query: Record<string, unknown> = {
         limit: Number(opts.limit),
         cursor: opts.cursor,
@@ -70,12 +75,42 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
         const v = opts[camel(f.query)];
         if (v !== undefined) query[f.query] = v;
       }
-      const body = unwrap(await list({ query }));
-      if (opts.csv) {
-        process.stdout.write(`${toCsv(body.data, spec.columns)}\n`);
+
+      if (opts.all) {
+        const rows: unknown[] = [];
+        let cursor: string | undefined;
+        let page: { nextCursor?: string | null; hasMore?: boolean } | undefined;
+        do {
+          const body = unwrap(await list({ query: { ...query, cursor } }));
+          rows.push(...(body.data ?? []));
+          page = body.page;
+          cursor = page?.nextCursor ?? undefined;
+        } while (page?.hasMore && cursor);
+        if (opts.raw) {
+          print(
+            { data: rows, page: { nextCursor: null, hasMore: false } },
+            { json: true },
+          );
+          return;
+        }
+        if (opts.csv) {
+          process.stdout.write(`${toCsv(rows, columns)}\n`);
+          return;
+        }
+        print(rows, { json: opts.json, columns });
         return;
       }
-      print(body.data, { json: opts.json, columns: spec.columns });
+
+      const body = unwrap(await list({ query }));
+      if (opts.raw) {
+        print(body, { json: true });
+        return;
+      }
+      if (opts.csv) {
+        process.stdout.write(`${toCsv(body.data, columns)}\n`);
+        return;
+      }
+      print(body.data, { json: opts.json, columns });
       if (!opts.json) printNextCursor(body.page);
     });
   }
