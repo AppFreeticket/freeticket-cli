@@ -1,6 +1,6 @@
 {
   "name": "@freeticket/cli",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Official FreeTicket CLI — consumes the B2B REST API for events, sales, tickets, memberships, venues, staff, and reports.",
   "keywords": [
     "freeticket",

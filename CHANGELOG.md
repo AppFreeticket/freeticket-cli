@@ -5,6 +5,8 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-30
+
 ### Added
 - **Self-service browser login:** `ft login` (no `--key`) now runs the OAuth 2.0
   Device Authorization Grant (RFC 8628) — prints a code, opens the browser, polls
@@ -12,6 +14,24 @@ versioning follows [SemVer](https://semver.org/).
   account can log in without a backend-issued API key. `ft login --key ft_live_…`
   stays for headless CI. Consumes `POST /auth/device/code` + `POST /auth/device/token`
   (free-admin#160).
+- **`--all`** on every list command: auto-paginates over the cursor and returns
+  the full result set (progress on stderr, data on stdout) (#8).
+- **`--columns <a,b,c>` / `--full`** on list commands to control which fields
+  reach the table and CSV, instead of only the default view columns (#6).
+- **Workspace commands:** `ft workspaces list`, `ft workspace use <id-or-slug>`,
+  and workspace shown by name/slug in `ft config` — switch and persist the active
+  workspace without editing `~/.freeticket/config.json` (#12).
+
+### Changed
+- **`--json` on lists now preserves pagination metadata:** returns the full
+  `{ data, page }` DTO so scripts can page from stdout alone, instead of dropping
+  `page.nextCursor` (#10).
+
+### Fixed
+- `ticket-types list` now shows `capacity` instead of the non-existent `stock`
+  column (no more empty `—` cells) (#6).
+- README/skill drift: documented the real `0.4.x`+ behaviour (device flow, write
+  ops) and a "version drift" troubleshooting note (#13).
 
 ## [0.4.0] - 2026-06-29
 
