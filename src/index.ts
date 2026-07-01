@@ -2,44 +2,56 @@ import { Command } from "commander";
 // Version synced with package.json at build time (tsup injects it via import).
 import pkg from "../package.json" with { type: "json" };
 import {
+  deleteDiscountsId,
   deleteEventsId,
   deleteEventsIdDatesDateId,
   deleteMembershipPlansId,
   deleteTicketTypesId,
   deleteVenuesId,
+  deleteWebhooksId,
+  getDiscounts,
   getEvents,
   getEventsId,
   getEventsIdDates,
   getMembershipPlans,
   getMembershipPlansId,
+  getMembershipPlansIdSubscribers,
   getSales,
   getSalesId,
+  getSalesIdTickets,
   getStaff,
   getTicketTypes,
   getTicketTypesId,
   getVenues,
   getVenuesId,
+  getWebhooks,
+  patchDiscountsId,
   patchEventsId,
   patchEventsIdDatesDateId,
   patchMembershipPlansId,
   patchStaffIdRole,
   patchTicketTypesId,
   patchVenuesId,
+  postDiscounts,
   postEvents,
   postEventsIdDates,
   postEventsIdPublish,
   postMembershipPlans,
+  postSales,
   postSalesIdCancel,
   postSalesIdRefund,
   postStaff,
+  postSubscriptionsIdCancel,
   postTicketTypes,
   postVenues,
+  postWebhooks,
 } from "./client/sdk.gen";
 import { registerAdmin } from "./commands/admin";
 import { registerAuth } from "./commands/auth";
 import { registerEventDates } from "./commands/event-dates";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
+import { registerTickets } from "./commands/tickets";
 import { registerWorkspace } from "./commands/workspace";
 import { banner } from "./lib/banner";
 
@@ -81,6 +93,7 @@ registerResource(program, {
   describe: "Sales",
   list: getSales,
   get: getSalesId,
+  create: postSales,
   actions: [
     { name: "cancel", describe: "Cancel a sale", fn: postSalesIdCancel },
     {
@@ -89,10 +102,42 @@ registerResource(program, {
       fn: postSalesIdRefund,
       body: true,
     },
+    {
+      name: "tickets",
+      describe: "List the individual tickets/attendees of a sale",
+      fn: getSalesIdTickets,
+    },
   ],
   columns: ["id", "reference", "status", "total", "currency", "createdAt"],
   listFlags: [
     { flag: "--status <s>", describe: "filter by status", query: "status" },
+    {
+      flag: "--channel <c>",
+      describe: "filter by sales channel",
+      query: "channel",
+    },
+    { flag: "--event <id>", describe: "filter by event", query: "event" },
+    {
+      flag: "--event-date <id>",
+      describe: "filter by event date",
+      query: "eventDate",
+    },
+    {
+      flag: "--reference <ref>",
+      describe: "filter by reference",
+      query: "reference",
+    },
+    {
+      flag: "--buyer <q>",
+      describe: "filter by buyer name/email",
+      query: "buyer",
+    },
+    {
+      flag: "--from <date>",
+      describe: "created from (ISO 8601)",
+      query: "from",
+    },
+    { flag: "--to <date>", describe: "created to (ISO 8601)", query: "to" },
   ],
 });
 
@@ -122,7 +167,53 @@ registerResource(program, {
   create: postMembershipPlans,
   update: patchMembershipPlansId,
   del: deleteMembershipPlansId,
+  actions: [
+    {
+      name: "subscribers",
+      describe: "List the subscribers/members of a plan",
+      fn: getMembershipPlansIdSubscribers,
+    },
+  ],
   columns: ["id", "name", "price", "currency", "billingCycle"],
+});
+
+registerResource(program, {
+  name: "discounts",
+  describe: "Discount codes / coupons",
+  list: getDiscounts,
+  create: postDiscounts,
+  update: patchDiscountsId,
+  del: deleteDiscountsId,
+  columns: ["id", "code", "type", "value", "active", "uses", "maxUses"],
+  listFlags: [
+    { flag: "--event <id>", describe: "filter by event", query: "event" },
+    {
+      flag: "--active <bool>",
+      describe: "filter by active (true/false)",
+      query: "active",
+    },
+  ],
+});
+
+registerResource(program, {
+  name: "webhooks",
+  describe: "Webhook endpoints (HMAC-signed event delivery)",
+  list: getWebhooks,
+  create: postWebhooks,
+  del: deleteWebhooksId,
+  columns: ["id", "url", "events", "active", "createdAt"],
+});
+
+registerResource(program, {
+  name: "subscriptions",
+  describe: "Plan subscriptions",
+  actions: [
+    {
+      name: "cancel",
+      describe: "Cancel a subscription",
+      fn: postSubscriptionsIdCancel,
+    },
+  ],
 });
 
 registerResource(program, {
@@ -152,6 +243,7 @@ registerResource(program, {
   columns: ["id", "name", "email", "role"],
 });
 
+registerTickets(program);
 registerReports(program);
 registerAdmin(program);
 
