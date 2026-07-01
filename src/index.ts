@@ -45,6 +45,33 @@ registerResource(program, {
   columns: ["id", "reference", "status", "total", "currency", "createdAt"],
   listFlags: [
     { flag: "--status <s>", describe: "filter by status", query: "status" },
+    {
+      flag: "--channel <c>",
+      describe: "WEB|MOBILE|POS|ADMIN",
+      query: "channel",
+    },
+    { flag: "--event <id>", describe: "filter by event id", query: "event" },
+    {
+      flag: "--event-date <id>",
+      describe: "filter by event date id",
+      query: "eventDate",
+    },
+    {
+      flag: "--reference <ref>",
+      describe: "partial reference match",
+      query: "reference",
+    },
+    {
+      flag: "--buyer <q>",
+      describe: "buyer name or email match",
+      query: "buyer",
+    },
+    {
+      flag: "--from <iso>",
+      describe: "created from (ISO 8601)",
+      query: "from",
+    },
+    { flag: "--to <iso>", describe: "created to (ISO 8601)", query: "to" },
   ],
 });
 
