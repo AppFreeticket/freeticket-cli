@@ -5,6 +5,32 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-01
+
+### Added
+- **Door check-in (`ft tickets`)** — `access <code>` reads a ticket's access
+  status, `checkin <code>` admits it at the door (idempotent, prevents double
+  entry), `resend <code>` re-sends the confirmation email/QR. Consumes
+  `GET/POST /tickets/{code}/access|checkin|resend` (free-admin#172, #173).
+- **Create sales (`ft sales create`)** — register comps and programmatic sales
+  via `POST /sales` (`--data <json>`) (free-admin#174).
+- **`ft sales tickets <id>`** — list the individual tickets/attendees of a sale
+  (free-admin#173).
+- **Discount codes (`ft discounts`)** — `list`/`create`/`update`/`delete`
+  coupons, filterable by `--event`/`--active` (free-admin#176).
+- **Webhooks (`ft webhooks`)** — `list`/`create`/`delete` HMAC-signed event
+  endpoints (free-admin#177).
+- **Subscriptions** — `ft plans subscribers <id>` lists a plan's members and
+  `ft subscriptions cancel <id>` cancels a subscription (free-admin#175).
+- **Reports** — `ft reports by-event`, `timeseries`, and `inventory`, plus the
+  `ft reports export attendees` CSV (free-admin#178, #165, #168).
+- **Sales list filters** — `--channel`, `--event`, `--event-date`,
+  `--reference`, `--buyer`, `--from`, `--to` on `ft sales list`; matching
+  filters on the buyers/attendees exports (free-admin#167, #168).
+
+### Changed
+- Regenerated the client from the B2B OpenAPI **1.4.0** contract.
+
 ## [0.5.0] - 2026-06-30
 
 ### Added

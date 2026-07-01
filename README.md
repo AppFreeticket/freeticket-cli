@@ -85,15 +85,25 @@ ft sales list --status CONFIRMED --json
 | `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
 | `ft ticket-types list` · `get <id>` | Ticket types (`--event-date-id`) | VIEWER |
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
-| `ft sales list` · `get <id>` | Sales (`--status`) | STAFF |
+| `ft sales list` · `get <id>` | Sales (filters: `--status` `--channel` `--event` `--event-date` `--reference` `--buyer` `--from` `--to`) | STAFF |
+| `ft sales create` | Create a sale/order — comps & programmatic sales (`--data <json>`) | ADMIN |
 | `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for partial refund) | ADMIN |
+| `ft sales tickets <id>` | List the individual tickets/attendees of a sale | STAFF |
+| `ft tickets access <code>` | Read a ticket's access status (no admit) | STAFF |
+| `ft tickets checkin <code>` | Admit a ticket at the door (idempotent) | STAFF |
+| `ft tickets resend <code>` | Resend the ticket's confirmation email (QR) | ADMIN |
 | `ft plans list` · `get <id>` | Membership plans | VIEWER |
 | `ft plans create` · `update <id>` · `delete <id>` | Manage membership plans (`--data <json>`) | ADMIN |
+| `ft plans subscribers <id>` | List a plan's subscribers/members | VIEWER |
+| `ft subscriptions cancel <id>` | Cancel a subscription | ADMIN |
+| `ft discounts list` · `create` · `update <id>` · `delete <id>` | Discount codes / coupons (`--event` `--active`; `--data <json>`) | ADMIN |
+| `ft webhooks list` · `create` · `delete <id>` | Webhook endpoints, HMAC-signed delivery (`--data <json>`) | ADMIN |
 | `ft venues list` · `get <id>` | Venues | VIEWER |
 | `ft venues create` · `update <id>` · `delete <id>` | Manage venues (`--data <json>`) | ADMIN |
 | `ft staff list` · `create` · `set-role <id>` | Workspace staff (`--data <json>`) | ADMIN |
 | `ft reports summary` | KPIs (`--period 7d\|30d\|90d\|1y`) | VIEWER |
-| `ft reports export buyers\|subscribers` | Export buyers / subscribers | ADMIN |
+| `ft reports by-event` · `timeseries` · `inventory` | Revenue/tickets by event, over time, and capacity/availability | VIEWER |
+| `ft reports export buyers\|attendees\|subscribers` | Export buyers / attendees / subscribers (CSV; filters `--event` `--event-date` `--from` `--to` `--status`) | ADMIN |
 
 > **Write operations** (`create`/`update`/`delete` and actions like `publish`,
 > `cancel`, `refund`) send a JSON body via `--data <inline-json>` or
