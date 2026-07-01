@@ -5,6 +5,29 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-01
+
+### Added
+- **Update notice.** `ft` now prints a one-line "update available" hint on
+  *stderr* when a newer `@freeticket/cli` is on npm. Checked at most once a day
+  (cached in `~/.freeticket`), interactive terminals only — never on `--json`
+  output, pipes, or CI. Opt out with `FT_NO_UPDATE_CHECK=1`.
+- **Manageable superadmin auth (`ft admin login|logout|config`)** — save a
+  SUPER_ADMIN session with `ft admin login --session <token>` (validated against
+  `GET /api/admin/me` before it's stored), inspect it masked with `ft admin
+  config`, and clear it with `ft admin logout`. No more hand-exporting
+  `FT_ADMIN_SESSION` every time (though it still works) (freeticket-cli#20).
+
+### Changed
+- **Auth wording is now "session", not "API key"** on the normal path: the
+  logged-out error, the 401 hint, `ft logout`, and `ft config` talk about your
+  session. `--key` / `FT_API_KEY` remain, framed as CI/headless only
+  (freeticket-cli#17).
+- Empty `--csv` lists now keep their **header row** when the columns are known,
+  so a zero-result export still carries its schema (freeticket-cli#18).
+- Documented the real `--json` (data array) vs `--raw` (`{ data, page }`
+  envelope) contract across README, changelog, and skill (freeticket-cli#19).
+
 ## [0.6.0] - 2026-07-01
 
 ### Added
@@ -49,9 +72,9 @@ versioning follows [SemVer](https://semver.org/).
   workspace without editing `~/.freeticket/config.json` (#12).
 
 ### Changed
-- **`--json` on lists now preserves pagination metadata:** returns the full
-  `{ data, page }` DTO so scripts can page from stdout alone, instead of dropping
-  `page.nextCursor` (#10).
+- **`--raw` on lists emits the full `{ data, page }` envelope** so scripts can
+  page from stdout alone. `--json` stays the data array only (stable, parseable);
+  reach for `--raw` when you need `page.nextCursor` (#10).
 
 ### Fixed
 - `ticket-types list` now shows `capacity` instead of the non-existent `stock`

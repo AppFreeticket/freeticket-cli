@@ -9,7 +9,10 @@ import { loadConfig } from "./config";
 export function configureClient(workspaceOverride?: string): void {
   const cfg = loadConfig();
   if (!cfg.apiKey) {
-    fail("No API key configured. Run `ft login` or export FT_API_KEY.");
+    fail(
+      "Not logged in. Run `ft login` to sign in through your browser.",
+      "CI / headless only: set FT_API_KEY (or `ft login --key`) with a backend-issued token.",
+    );
   }
   const workspaceId = workspaceOverride ?? cfg.workspaceId;
   client.setConfig({
@@ -78,7 +81,7 @@ export function unwrap<T>(res: {
 function hintFor(status?: number): string | undefined {
   switch (status) {
     case 401:
-      return "Invalid, revoked, or expired API key. Run `ft login`.";
+      return "Your session is invalid, revoked, or expired. Run `ft login`.";
     case 403:
       return "Your role or workspace does not allow this action.";
     case 404:

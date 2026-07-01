@@ -113,11 +113,11 @@ ft sales list --status CONFIRMED --json
 
 | Flag | Applies to | Description |
 |---|---|---|
-| `--json` | all commands | Raw JSON output, ideal for `jq` and scripts |
+| `--json` | all commands | Raw JSON, ideal for `jq`/scripts. On **lists this is the data array only** — use `--raw` for the paginated envelope |
 | `--workspace <id>` | all commands | Run the command against another workspace |
 | `--limit <n>` `--cursor <id>` | list commands | Cursor pagination (1-100, default 20) |
 | `--all` | list commands | Auto-paginate: fetch every page (ignores `--cursor`) |
-| `--raw` | list commands | JSON output including the `page` pagination metadata |
+| `--raw` | list commands | JSON `{ data, page }` envelope, including `page.nextCursor` for scripted pagination |
 | `--columns <a,b,c>` `--full` | list commands | Pick specific columns · show every field |
 | `--csv` | list commands | CSV output for spreadsheets/accounting |
 | `--data <json>` `--yes` | write commands | JSON body (inline or `@file`) · skip delete confirmation |
@@ -133,11 +133,12 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | Variable | Default | Description |
 |---|---|---|
 | `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL (without `/api/v1`) |
-| `FT_API_KEY` | — | Your `ft_live_...` key |
+| `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key |
 | `FT_WORKSPACE_ID` | *home* | Default active workspace |
+| `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice |
 
 The `~/.freeticket/config.json` file is created with `0600` permissions (only
-your user can read it) because it stores the API key. See [`.env.example`](./.env.example).
+your user can read it) because it stores your credentials. See [`.env.example`](./.env.example).
 
 ## Pagination, errors, and money
 

@@ -32,21 +32,26 @@ export function print(data: unknown, opts: PrintOpts = {}): void {
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
 }
 
+function csvEsc(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 /**
  * Serializes an array of flat rows to CSV (RFC 4180 quoting). Columns default
  * to the first row's keys. Objects/arrays in cells are JSON-stringified.
+ * When there are no rows but the caller knows the columns, we still emit the
+ * header line so the CSV keeps its schema (useful for spreadsheets/pipelines).
  */
 export function toCsv(rows: unknown, columns?: string[]): string {
-  if (!Array.isArray(rows) || rows.length === 0) return "";
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return columns?.length ? columns.map(csvEsc).join(",") : "";
+  }
   const cols = columns ?? Object.keys(rows[0] as object);
-  const esc = (v: unknown): string => {
-    if (v === null || v === undefined) return "";
-    const s = typeof v === "object" ? JSON.stringify(v) : String(v);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const head = cols.map(esc).join(",");
+  const head = cols.map(csvEsc).join(",");
   const body = (rows as Record<string, unknown>[]).map((r) =>
-    cols.map((c) => esc(r[c])).join(","),
+    cols.map((c) => csvEsc(r[c])).join(","),
   );
   return [head, ...body].join("\n");
 }
