@@ -11,7 +11,7 @@ import {
   getReportsTimeseries,
 } from "../client/sdk.gen";
 import { configureClient, unwrap } from "../lib/api";
-import { print } from "../lib/output";
+import { print, toCsv } from "../lib/output";
 
 export function registerReports(program: Command): void {
   const root = program.command("reports").description("KPIs and exports");
@@ -146,6 +146,7 @@ export function registerReports(program: Command): void {
     .option("--provider <p>", "filter by payment provider")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
@@ -158,7 +159,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      print(body.data ?? body, { json: opts.json });
+      printExport(body.data ?? body, opts);
     });
 
   // buyers = one row per sale, attendees = one row per ticket; both filterable.
@@ -176,6 +177,7 @@ export function registerReports(program: Command): void {
       .option("--status <s>", "filter by sale status")
       .option("--workspace <id>", "workspace override")
       .option("--json", "raw JSON output")
+      .option("--csv", "CSV output (for spreadsheets/accounting)")
       .action(async (opts) => {
         configureClient(opts.workspace);
         const body = unwrap(
@@ -189,7 +191,7 @@ export function registerReports(program: Command): void {
             },
           }),
         );
-        print(body.data ?? body, { json: opts.json });
+        printExport(body.data ?? body, opts);
       });
   }
 
@@ -198,9 +200,19 @@ export function registerReports(program: Command): void {
     .description("Export subscribers")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(await getReportsExportsSubscribers({}));
-      print(body.data ?? body, { json: opts.json });
+      printExport(body.data ?? body, opts);
     });
+}
+
+/** Exports promise "(CSV)": honor --csv when rows are tabular, else JSON/table. */
+function printExport(rows: unknown, opts: { json?: boolean; csv?: boolean }) {
+  if (opts.csv && Array.isArray(rows)) {
+    process.stdout.write(`${toCsv(rows)}\n`);
+    return;
+  }
+  print(rows, { json: opts.json });
 }

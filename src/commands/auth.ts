@@ -26,6 +26,7 @@ export function registerAuth(program: Command): void {
       "API base URL (default: https://admin.appfreeticket.com)",
     )
     .option("--workspace <id>", "default active workspace")
+    .option("--json", "raw JSON output (confirmation goes to stderr)")
     .action(async (opts) => {
       if (opts.url) saveConfig({ apiUrl: opts.url });
 
@@ -42,10 +43,11 @@ export function registerAuth(program: Command): void {
       // Verify the credential against /me before reporting success.
       configureClient(workspaceId);
       const me = unwrap(await getMe({})).data;
-      console.log(
+      // stderr so `ft login --json | jq` stays parseable.
+      console.error(
         `${chalk.green("✓")} Session saved in ${chalk.dim(CONFIG_PATH)}`,
       );
-      print(me, {});
+      print(me, { json: opts.json });
     });
 
   program
@@ -71,7 +73,8 @@ export function registerAuth(program: Command): void {
   program
     .command("config")
     .description("Show active configuration (the credential is masked)")
-    .action(() => {
+    .option("--json", "raw JSON output")
+    .action((opts) => {
       const cfg = loadConfig();
       print(
         {
@@ -80,7 +83,7 @@ export function registerAuth(program: Command): void {
           session: cfg.apiKey ? `${cfg.apiKey.slice(0, 12)}…` : null,
           workspaceId: cfg.workspaceId ?? null,
         },
-        {},
+        { json: opts.json },
       );
     });
 }
