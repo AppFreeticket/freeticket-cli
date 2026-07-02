@@ -54,6 +54,7 @@ import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
 import { registerWorkspace } from "./commands/workspace";
 import { banner } from "./lib/banner";
+import { notifyUpdate } from "./lib/update-check";
 
 const program = new Command();
 
@@ -254,7 +255,12 @@ if (process.argv.length <= 2) {
   process.exit(0);
 }
 
-program.parseAsync().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+program
+  .parseAsync()
+  // After the command runs, drop a one-line update notice on stderr (once/day,
+  // TTY-only). Never blocks or fails the command.
+  .then(() => notifyUpdate(pkg.version))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });

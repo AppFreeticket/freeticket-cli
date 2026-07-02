@@ -60,23 +60,24 @@ export function registerAuth(program: Command): void {
 
   program
     .command("logout")
-    .description("Remove the stored API key")
+    .description("Log out and remove the stored session")
     .action(() => {
       saveConfig({ apiKey: undefined });
       console.log(
-        `${chalk.green("✓")} API key removed from ${chalk.dim(CONFIG_PATH)}`,
+        `${chalk.green("✓")} Logged out — session removed from ${chalk.dim(CONFIG_PATH)}`,
       );
     });
 
   program
     .command("config")
-    .description("Show active configuration (the API key is masked)")
+    .description("Show active configuration (the credential is masked)")
     .action(() => {
       const cfg = loadConfig();
       print(
         {
           apiUrl: cfg.apiUrl,
-          apiKey: cfg.apiKey ? `${cfg.apiKey.slice(0, 12)}…` : null,
+          // Same field whether it's a device-flow session or a CI API key.
+          session: cfg.apiKey ? `${cfg.apiKey.slice(0, 12)}…` : null,
           workspaceId: cfg.workspaceId ?? null,
         },
         {},

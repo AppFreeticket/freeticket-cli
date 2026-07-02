@@ -1,4 +1,5 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: generated SDK boundary — signatures vary by resource.
+import chalk from "chalk";
 import type { Command } from "commander";
 import {
   getAuditLog,
@@ -22,6 +23,7 @@ import {
   putFeatureFlagsKey,
 } from "../admin-client/sdk.gen";
 import { configureAdminClient, unwrap } from "../lib/api";
+import { CONFIG_PATH, loadConfig, saveConfig } from "../lib/config";
 import { confirm, parseData } from "../lib/input";
 import { print, printNextCursor, toCsv } from "../lib/output";
 
@@ -66,7 +68,58 @@ interface AdminResource {
 export function registerAdmin(program: Command): void {
   const admin = program
     .command("admin")
-    .description("Superadmin (cross-tenant) — requires FT_ADMIN_SESSION");
+    .description("Superadmin (cross-tenant) — SUPER_ADMIN session required");
+
+  admin
+    .command("login")
+    .description(
+      "Save a SUPER_ADMIN session and validate it against /api/admin/me",
+    )
+    .requiredOption(
+      "--session <token>",
+      "the `better-auth.session_token` cookie value from an authenticated admin browser session",
+    )
+    .option(
+      "--url <url>",
+      "API base URL (default: https://admin.appfreeticket.com)",
+    )
+    .action(async (opts) => {
+      if (opts.url) saveConfig({ apiUrl: opts.url });
+      saveConfig({ adminSession: opts.session });
+      // Verify before declaring success — a bad cookie fails here, not later.
+      configureAdminClient();
+      const me = unwrap(await getMe({})).data;
+      console.log(
+        `${chalk.green("✓")} Admin session saved in ${chalk.dim(CONFIG_PATH)}`,
+      );
+      print(me, {});
+    });
+
+  admin
+    .command("logout")
+    .description("Remove the stored superadmin session")
+    .action(() => {
+      saveConfig({ adminSession: undefined });
+      console.log(
+        `${chalk.green("✓")} Admin session removed from ${chalk.dim(CONFIG_PATH)}`,
+      );
+    });
+
+  admin
+    .command("config")
+    .description("Show admin configuration (the session is masked)")
+    .action(() => {
+      const cfg = loadConfig();
+      print(
+        {
+          apiUrl: cfg.apiUrl,
+          adminSession: cfg.adminSession
+            ? `${cfg.adminSession.slice(0, 12)}…`
+            : null,
+        },
+        {},
+      );
+    });
 
   admin
     .command("me")
