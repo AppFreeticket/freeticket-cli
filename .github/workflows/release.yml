@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
 jobs:
   publish:
@@ -18,6 +18,17 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
+      - id: version
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          local_version="$(node -p "require('./package.json').version")"
+          published_version="$(npm view "$package_name" version 2>/dev/null || true)"
+
+          if [ "$local_version" = "$published_version" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm generate
       - run: pnpm test
@@ -25,4 +36,5 @@ jobs:
       # npm Trusted Publishing exchanges this GitHub OIDC identity for a
       # short-lived publish credential; no long-lived NPM_TOKEN is stored.
       - run: npm install --global npm@latest
-      - run: npm publish --provenance --access public
+      - if: steps.version.outputs.publish == 'true'
+        run: npm publish --provenance --access public
