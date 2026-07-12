@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+### Patch Changes
+
+- 1bfd455: Automate npm releases through GitHub Actions trusted publishing.
+
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
@@ -8,17 +14,19 @@ versioning follows [SemVer](https://semver.org/).
 ## [0.7.0] - 2026-07-01
 
 ### Added
+
 - **Update notice.** `ft` now prints a one-line "update available" hint on
-  *stderr* when a newer `@freeticket/cli` is on npm. Checked at most once a day
+  _stderr_ when a newer `@freeticket/cli` is on npm. Checked at most once a day
   (cached in `~/.freeticket`), interactive terminals only — never on `--json`
   output, pipes, or CI. Opt out with `FT_NO_UPDATE_CHECK=1`.
 - **Manageable superadmin auth (`ft admin login|logout|config`)** — save a
   SUPER_ADMIN session with `ft admin login --session <token>` (validated against
   `GET /api/admin/me` before it's stored), inspect it masked with `ft admin
-  config`, and clear it with `ft admin logout`. No more hand-exporting
+config`, and clear it with `ft admin logout`. No more hand-exporting
   `FT_ADMIN_SESSION` every time (though it still works) (freeticket-cli#20).
 
 ### Changed
+
 - **Auth wording is now "session", not "API key"** on the normal path: the
   logged-out error, the 401 hint, `ft logout`, and `ft config` talk about your
   session. `--key` / `FT_API_KEY` remain, framed as CI/headless only
@@ -31,6 +39,7 @@ versioning follows [SemVer](https://semver.org/).
 ## [0.6.0] - 2026-07-01
 
 ### Added
+
 - **Door check-in (`ft tickets`)** — `access <code>` reads a ticket's access
   status, `checkin <code>` admits it at the door (idempotent, prevents double
   entry), `resend <code>` re-sends the confirmation email/QR. Consumes
@@ -52,11 +61,13 @@ versioning follows [SemVer](https://semver.org/).
   filters on the buyers/attendees exports (free-admin#167, #168).
 
 ### Changed
+
 - Regenerated the client from the B2B OpenAPI **1.4.0** contract.
 
 ## [0.5.0] - 2026-06-30
 
 ### Added
+
 - **Self-service browser login:** `ft login` (no `--key`) now runs the OAuth 2.0
   Device Authorization Grant (RFC 8628) — prints a code, opens the browser, polls
   until you approve, and stores the minted session. Anyone with a FreeTicket
@@ -72,11 +83,13 @@ versioning follows [SemVer](https://semver.org/).
   workspace without editing `~/.freeticket/config.json` (#12).
 
 ### Changed
+
 - **`--raw` on lists emits the full `{ data, page }` envelope** so scripts can
   page from stdout alone. `--json` stays the data array only (stable, parseable);
   reach for `--raw` when you need `page.nextCursor` (#10).
 
 ### Fixed
+
 - `ticket-types list` now shows `capacity` instead of the non-existent `stock`
   column (no more empty `—` cells) (#6).
 - README/skill drift: documented the real `0.4.x`+ behaviour (device flow, write
@@ -85,6 +98,7 @@ versioning follows [SemVer](https://semver.org/).
 ## [0.4.0] - 2026-06-29
 
 ### Added
+
 - **Write layer (B2B v1):** every resource now has `create`/`update`/`delete`
   plus resource actions — `events publish`, `sales cancel`/`refund`,
   `staff create`/`set-role`. Bodies via `--data` (inline JSON or `@file.json`);
@@ -103,6 +117,7 @@ versioning follows [SemVer](https://semver.org/).
 ## [0.3.0] - 2026-06-29
 
 ### Added
+
 - Superadmin commands (`ft admin …`) against the separate `/api/admin` contract
   (Admin API v1.0.0): `me`, `workspaces`, `users`, `plans`, `feature-flags`,
   `audit-log` (read-only first pass).
@@ -116,6 +131,7 @@ versioning follows [SemVer](https://semver.org/).
 ## [0.2.0] - 2026-06-29
 
 ### Added
+
 - CFO financial reconciliation against B2B contract v1.1.0:
   `ft reports reconciliation` and `ft reports export reconciliation` — cross
   Mercado Pago payment, sale and Siigo invoice with a `match_status` per sale.
@@ -123,12 +139,14 @@ versioning follows [SemVer](https://semver.org/).
 ## [0.1.1] - 2026-06-25
 
 ### Changed
+
 - Translate package documentation and CLI user-facing text to English.
 - Publish under the `@freeticket/cli` npm scope.
 
 ## [0.1.0] - 2026-06-25
 
 ### Added
+
 - Initial `ft` CLI generated from the OpenAPI 3.1 contract for the B2B API v1.
 - API key authentication (`ft login` / `whoami` / `logout` / `config`).
 - Read commands: `events`, `ticket-types`, `sales`, `plans`, `venues`, `staff`,
