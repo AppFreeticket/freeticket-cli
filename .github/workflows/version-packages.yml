@@ -1,4 +1,4 @@
-name: Version Packages
+name: Version and Publish Packages
 
 on:
   push:
@@ -9,23 +9,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  version:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
+          registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
-      - uses: changesets/action@v1
-        with:
-          version: pnpm changeset version
-          commit: "chore: version packages"
-          title: "chore: version packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: changesets
+        run: |
+          pnpm changeset status --output=changeset-status.json
+          if node -e "process.exit(require('./changeset-status.json').releases.length ? 0 : 1)"; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changesets.outputs.pending == 'true'
+        run: pnpm changeset version
+      - if: steps.changesets.outputs.pending == 'true'
+        run: pnpm generate
+      - if: steps.changesets.outputs.pending == 'true'
+        run: pnpm test
+      - if: steps.changesets.outputs.pending == 'true'
+        run: pnpm build
+      - if: steps.changesets.outputs.pending == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .changeset CHANGELOG.md package.json
+          git commit -m "chore: version packages"
+          git push origin HEAD:main
+      # npm Trusted Publishing exchanges this GitHub OIDC identity for a
+      # short-lived publish credential; no long-lived NPM_TOKEN is stored.
+      - if: steps.changesets.outputs.pending == 'true'
+        run: npm install --global npm@latest
+      - if: steps.changesets.outputs.pending == 'true'
+        run: npm publish --provenance --access public

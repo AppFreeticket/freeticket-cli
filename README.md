@@ -164,9 +164,9 @@ pnpm lint         # biome
 ### Releases
 
 Use `pnpm changeset` for every user-facing CLI change and commit the generated
-file in `.changeset/`. Once the change is merged to `main`, GitHub opens or
-updates a version PR. Merging that version PR publishes the new package version
-to npm automatically with provenance; no npm token or manual tag is required.
+file in `.changeset/`. Once the change is merged to `main`, GitHub publishes the
+new package version to npm automatically with provenance. The version and
+changelog update are committed to `main`; no npm token or manual tag is required.
 
 ### Keeping the client in sync with the backend
 
