@@ -8,16 +8,28 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write # provenance npm
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
+      - run: pnpm install --frozen-lockfile
+      - id: changesets
+        run: |
+          if find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit | grep -q .; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changesets.outputs.pending == 'true'
+        run: pnpm changeset version
       - id: version
         run: |
           package_name="$(node -p "require('./package.json').name")"
@@ -29,12 +41,22 @@ jobs:
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm generate
-      - run: pnpm test
-      - run: pnpm build
+      - if: steps.version.outputs.publish == 'true'
+        run: pnpm generate
+      - if: steps.version.outputs.publish == 'true'
+        run: pnpm test
+      - if: steps.version.outputs.publish == 'true'
+        run: pnpm build
+      - if: steps.changesets.outputs.pending == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .changeset CHANGELOG.md package.json
+          git commit -m "chore: version packages"
+          git push origin HEAD:main
       # npm Trusted Publishing exchanges this GitHub OIDC identity for a
       # short-lived publish credential; no long-lived NPM_TOKEN is stored.
-      - run: npm install --global npm@latest
+      - if: steps.version.outputs.publish == 'true'
+        run: npm install --global npm@latest
       - if: steps.version.outputs.publish == 'true'
         run: npm publish --provenance --access public
