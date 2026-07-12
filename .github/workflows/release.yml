@@ -22,6 +22,7 @@ jobs:
       - run: pnpm generate
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # npm Trusted Publishing exchanges this GitHub OIDC identity for a
+      # short-lived publish credential; no long-lived NPM_TOKEN is stored.
+      - run: npm install --global npm@latest
+      - run: npm publish --provenance --access public
