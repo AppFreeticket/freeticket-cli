@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket B2B API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "API REST B2B de FreeTicket para integraciones y el CLI. Autenticación por API key (header `Authorization: Bearer <key>` o `x-api-key`); el workspace activo se selecciona con el header `X-Workspace-Id`."
   },
   "servers": [
@@ -273,7 +273,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Crear evento (fase 2)",
+        "summary": "Crear evento",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -441,7 +441,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Actualizar evento (fase 2)",
+        "summary": "Actualizar evento",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -534,7 +534,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Eliminar (soft) evento (fase 2)",
+        "summary": "Eliminar (soft) evento",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -611,7 +611,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Publicar evento (fase 2)",
+        "summary": "Publicar evento",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -782,7 +782,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Agregar fecha a un evento (fase 2)",
+        "summary": "Agregar fecha a un evento",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -799,6 +799,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventDateCreate"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "OK",
@@ -867,7 +877,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Actualizar fecha (fase 2)",
+        "summary": "Actualizar fecha",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -892,6 +902,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventDateUpdate"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -958,7 +978,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Eliminar fecha (fase 2)",
+        "summary": "Eliminar fecha",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -1150,7 +1170,7 @@
         "tags": [
           "ticket-types"
         ],
-        "summary": "Crear tipo de ticket (fase 2)",
+        "summary": "Crear tipo de ticket",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -1318,7 +1338,7 @@
         "tags": [
           "ticket-types"
         ],
-        "summary": "Actualizar tipo de ticket (fase 2)",
+        "summary": "Actualizar tipo de ticket",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -1335,6 +1355,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketTypeUpdate"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -1401,7 +1431,7 @@
         "tags": [
           "ticket-types"
         ],
-        "summary": "Eliminar (soft) tipo de ticket (fase 2)",
+        "summary": "Eliminar (soft) tipo de ticket",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -1818,7 +1848,7 @@
         "tags": [
           "sales"
         ],
-        "summary": "Cancelar una venta (fase 2)",
+        "summary": "Cancelar una venta",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -1903,8 +1933,8 @@
         "tags": [
           "sales"
         ],
-        "summary": "Reembolsar una venta (fase 2)",
-        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
+        "summary": "Marcar una venta como REEMBOLSADA (NO ejecuta el reembolso en MercadoPago)",
+        "description": "Marca la venta como REFUNDED y libera las sillas numeradas asociadas. IMPORTANTE: este endpoint NO dispara el reembolso real en el proveedor de pago (MercadoPago); el dinero NO se devuelve al comprador automáticamente. Un 200 aquí confirma únicamente el cambio de estado contable, no el movimiento de fondos. El reembolso en MercadoPago debe gestionarse por separado (panel de MercadoPago o su API).",
         "security": [
           {
             "apiKey": []
@@ -2086,7 +2116,7 @@
         "tags": [
           "membership-plans"
         ],
-        "summary": "Crear plan de membresía (fase 2)",
+        "summary": "Crear plan de membresía",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -2254,7 +2284,7 @@
         "tags": [
           "membership-plans"
         ],
-        "summary": "Actualizar plan (fase 2)",
+        "summary": "Actualizar plan",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -2271,6 +2301,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipPlanUpdate"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -2337,7 +2377,7 @@
         "tags": [
           "membership-plans"
         ],
-        "summary": "Eliminar (soft) plan (fase 2)",
+        "summary": "Eliminar (soft) plan",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -2512,7 +2552,7 @@
         "tags": [
           "venues"
         ],
-        "summary": "Crear venue (fase 2)",
+        "summary": "Crear venue",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -2680,7 +2720,7 @@
         "tags": [
           "venues"
         ],
-        "summary": "Actualizar venue (fase 2)",
+        "summary": "Actualizar venue",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -2697,6 +2737,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VenueUpdate"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -2763,7 +2813,7 @@
         "tags": [
           "venues"
         ],
-        "summary": "Eliminar (soft) venue (fase 2)",
+        "summary": "Eliminar (soft) venue",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -2938,7 +2988,7 @@
         "tags": [
           "staff"
         ],
-        "summary": "Crear usuario staff (fase 2)",
+        "summary": "Crear usuario staff en el workspace",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -3023,7 +3073,7 @@
         "tags": [
           "staff"
         ],
-        "summary": "Cambiar rol de un usuario staff (fase 2)",
+        "summary": "Cambiar rol de un usuario staff",
         "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
         "security": [
           {
@@ -5182,6 +5232,266 @@
         }
       }
     },
+    "/api-keys": {
+      "get": {
+        "operationId": "getApiKeys",
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Listar mis API keys",
+        "description": "Lista las API keys del usuario autenticado (nunca el hash ni el secreto en claro).",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiKey"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiKeys",
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Mintear una API key (devuelve el plano una única vez)",
+        "description": "Crea una API key de servicio para el usuario autenticado. scope=\"read\" (default) solo permite GET/HEAD; scope=\"write\" habilita mutaciones según el rol del usuario. El secreto en claro solo aparece en esta respuesta.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ApiKeyCreated"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api-keys/{id}": {
+      "delete": {
+        "operationId": "deleteApiKeysId",
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Revocar una de mis API keys",
+        "description": "Rol mínimo: `VIEWER`. Workspace activo vía header `X-Workspace-Id`.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticketCode}/resend": {
       "post": {
         "operationId": "postTicketsTicketCodeResend",
@@ -5777,6 +6087,129 @@
         },
         "additionalProperties": false
       },
+      "EventDateCreate": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "endsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doorsOpenAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "default": "America/Bogota",
+            "type": "string"
+          },
+          "venueId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "startsAt",
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "EventDateUpdate": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "endsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doorsOpenAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "venueId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "TicketType": {
         "type": "object",
         "properties": {
@@ -5916,6 +6349,49 @@
         ],
         "additionalProperties": false
       },
+      "TicketTypeUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "maxPerOrder": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "isVisible": {
+            "type": "boolean"
+          },
+          "organizerAbsorbsFee": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "SaleItem": {
         "type": "object",
         "properties": {
@@ -6027,6 +6503,26 @@
               }
             ]
           },
+          "paymentProvider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paymentRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "confirmedAt": {
             "anyOf": [
               {
@@ -6056,6 +6552,8 @@
           "buyerEmail",
           "buyerPhone",
           "organizationId",
+          "paymentProvider",
+          "paymentRef",
           "confirmedAt",
           "createdAt"
         ],
@@ -6127,6 +6625,26 @@
               }
             ]
           },
+          "paymentProvider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paymentRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "confirmedAt": {
             "anyOf": [
               {
@@ -6162,6 +6680,8 @@
           "buyerEmail",
           "buyerPhone",
           "organizationId",
+          "paymentProvider",
+          "paymentRef",
           "confirmedAt",
           "createdAt",
           "items"
@@ -6317,6 +6837,12 @@
           "isActive": {
             "default": true,
             "type": "boolean"
+          },
+          "sortOrder": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -6329,8 +6855,68 @@
           "benefitDiscount",
           "benefitExclusiveContent",
           "benefitMerch",
-          "isActive"
+          "isActive",
+          "sortOrder"
         ],
+        "additionalProperties": false
+      },
+      "MembershipPlanUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billingCycle": {
+            "type": "string",
+            "enum": [
+              "MONTHLY",
+              "QUARTERLY",
+              "ANNUAL",
+              "LIFETIME"
+            ]
+          },
+          "benefitPresale": {
+            "type": "boolean"
+          },
+          "benefitFreeTicket": {
+            "type": "boolean"
+          },
+          "benefitDiscount": {
+            "type": "boolean"
+          },
+          "benefitExclusiveContent": {
+            "type": "boolean"
+          },
+          "benefitMerch": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
         "additionalProperties": false
       },
       "Venue": {
@@ -6471,6 +7057,68 @@
           "city",
           "country"
         ],
+        "additionalProperties": false
+      },
+      "VenueUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portalVisible": {
+            "type": "boolean"
+          }
+        },
         "additionalProperties": false
       },
       "StaffUser": {
@@ -7495,6 +8143,179 @@
           "startsAt",
           "ticketTypeName",
           "checkedInAt"
+        ],
+        "additionalProperties": false
+      },
+      "ApiKeyScope": {
+        "type": "string",
+        "enum": [
+          "read",
+          "write"
+        ]
+      },
+      "ApiKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "keyPrefix": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revokedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "keyPrefix",
+          "lastUsedAt",
+          "expiresAt",
+          "revokedAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "ApiKeyCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "keyPrefix": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revokedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "keyPrefix",
+          "lastUsedAt",
+          "expiresAt",
+          "revokedAt",
+          "createdAt",
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "ApiKeyCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "scope": {
+            "default": "read",
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "name",
+          "scope"
         ],
         "additionalProperties": false
       },

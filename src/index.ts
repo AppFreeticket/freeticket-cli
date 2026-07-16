@@ -47,6 +47,7 @@ import {
   postWebhooks,
 } from "./client/sdk.gen";
 import { registerAdmin } from "./commands/admin";
+import { registerApiKeys } from "./commands/api-keys";
 import { registerAuth } from "./commands/auth";
 import { registerEventDates } from "./commands/event-dates";
 import { registerReports } from "./commands/reports";
@@ -246,6 +247,7 @@ registerResource(program, {
 
 registerTickets(program);
 registerReports(program);
+registerApiKeys(program);
 registerAdmin(program);
 
 // No arguments -> banner + help.
