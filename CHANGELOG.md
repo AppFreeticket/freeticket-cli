@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+### Minor Changes
+
+- 2757bca: Add `ft api-keys create|list|revoke` for self-service API key management. `create` mints a key and prints the plaintext secret once (with a copy-now warning), `list` shows your keys without ever exposing the secret, and `revoke` deletes a key with confirmation.
+
 ## 0.7.1
 
 ### Patch Changes
