@@ -3,7 +3,7 @@ import type { Command } from "commander";
 import { deleteApiKeysId, getApiKeys, postApiKeys } from "../client/sdk.gen";
 import type { ApiKeyScope } from "../client/types.gen";
 import { configureClient, fail, unwrap } from "../lib/api";
-import { confirm } from "../lib/input";
+import { confirmOrExit } from "../lib/input";
 import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
 
 /** Columns shown in `api-keys list` — never the secret (the API never returns it). */
@@ -132,10 +132,7 @@ export function registerApiKeys(program: Command): void {
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
     .action(async (id, opts) => {
-      if (!opts.yes && !(await confirm(`Revoke API key ${id}?`))) {
-        console.error("Aborted.");
-        return;
-      }
+      await confirmOrExit(`Revoke API key ${id}?`, opts.yes);
       configureClient(opts.workspace);
       const body = unwrap(await deleteApiKeysId({ path: { id } }));
       print(body?.data ?? { revoked: id }, { json: opts.json });

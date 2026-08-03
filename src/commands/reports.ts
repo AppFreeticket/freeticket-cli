@@ -5,6 +5,7 @@ import {
   getReportsExportsBuyers,
   getReportsExportsReconciliation,
   getReportsExportsSubscribers,
+  getReportsFinancials,
   getReportsInventory,
   getReportsReconciliation,
   getReportsSummary,
@@ -59,6 +60,29 @@ export function registerReports(program: Command): void {
         }),
       );
       print(body.data, { json: opts.json });
+    });
+
+  root
+    .command("financials")
+    .description(
+      "Per-function P&L: gross, platform fee, facial, payment fee, 4x1000, net to settle",
+    )
+    .option("--event <id>", "filter by event")
+    .option("--past", "only functions that already happened (settleable)")
+    .option("--workspace <id>", "workspace override")
+    .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
+    .action(async (opts) => {
+      configureClient(opts.workspace);
+      const body = unwrap(
+        await getReportsFinancials({
+          query: {
+            event: opts.event,
+            past: opts.past === undefined ? undefined : String(opts.past),
+          },
+        }),
+      );
+      printExport(body.data, opts);
     });
 
   root
@@ -208,8 +232,21 @@ export function registerReports(program: Command): void {
     });
 }
 
-/** Exports promise "(CSV)": honor --csv when rows are tabular, else JSON/table. */
-function printExport(rows: unknown, opts: { json?: boolean; csv?: boolean }) {
+/**
+ * Exports promise "(CSV)". Two server shapes reach here:
+ *  - `text/csv` → the payload is already a CSV string. Write it verbatim;
+ *    running it through print()/JSON.stringify would quote the whole file and
+ *    escape the newlines as literal `\n` (issue #22).
+ *  - `application/json` → an array of rows: honor --csv, else JSON/table.
+ */
+export function printExport(
+  rows: unknown,
+  opts: { json?: boolean; csv?: boolean },
+) {
+  if (typeof rows === "string") {
+    process.stdout.write(rows.endsWith("\n") ? rows : `${rows}\n`);
+    return;
+  }
   if (opts.csv && Array.isArray(rows)) {
     process.stdout.write(`${toCsv(rows)}\n`);
     return;

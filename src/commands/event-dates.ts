@@ -1,7 +1,7 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: generated SDK boundary — signatures vary by resource.
 import type { Command } from "commander";
 import { configureClient, unwrap } from "../lib/api";
-import { confirm, parseData } from "../lib/input";
+import { confirmOrExit, parseData } from "../lib/input";
 import { print } from "../lib/output";
 
 type SdkFn = (
@@ -86,10 +86,7 @@ export function registerEventDates(
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
     .action(async (eventId, dateId, opts) => {
-      if (!opts.yes && !(await confirm(`Delete date ${dateId}?`))) {
-        console.error("Aborted.");
-        return;
-      }
+      await confirmOrExit(`Delete date ${dateId}?`, opts.yes);
       configureClient(opts.workspace);
       const body = unwrap(await spec.del({ path: { id: eventId, dateId } }));
       print(body?.data ?? { deleted: dateId }, { json: opts.json });

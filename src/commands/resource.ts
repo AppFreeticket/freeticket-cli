@@ -1,7 +1,7 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: generated SDK boundary — signatures vary by resource.
 import type { Command } from "commander";
 import { configureClient, unwrap } from "../lib/api";
-import { confirm, parseData } from "../lib/input";
+import { confirmOrExit, parseData } from "../lib/input";
 import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
 
 type SdkFn = (
@@ -170,10 +170,7 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .option("--workspace <id>", "workspace override")
       .option("--json", "raw JSON output")
       .action(async (id, opts) => {
-        if (!opts.yes && !(await confirm(`Delete ${singular} ${id}?`))) {
-          console.error("Aborted.");
-          return;
-        }
+        await confirmOrExit(`Delete ${singular} ${id}?`, opts.yes);
         configureClient(opts.workspace);
         const body = unwrap(await del({ path: { id } }));
         print(body?.data ?? { deleted: id }, { json: opts.json });

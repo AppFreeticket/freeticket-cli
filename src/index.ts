@@ -19,6 +19,7 @@ import {
   getSales,
   getSalesId,
   getSalesIdTickets,
+  getSettlements,
   getStaff,
   getTicketTypes,
   getTicketTypesId,
@@ -81,6 +82,25 @@ registerResource(program, {
   ],
   // startsAt lives on EventDate, not Event — use createdAt for a temporal column.
   columns: ["id", "name", "status", "createdAt"],
+  listFlags: [{ flag: "--q <text>", describe: "search by name", query: "q" }],
+});
+
+// Read-only: settlements are created by FreeTicket, never by the organizer.
+// The PDF/comprobante is still panel-only — the contract exposes hasDocument
+// and the file names, not a download URL (see CONTRACT-GAPS.md).
+registerResource(program, {
+  name: "settlements",
+  describe: "Settlements paid to the organizer",
+  list: getSettlements,
+  columns: ["id", "reference", "status", "amount", "currency", "createdAt"],
+  listFlags: [
+    { flag: "--event <id>", describe: "filter by event", query: "event" },
+    {
+      flag: "--status <s>",
+      describe: "SENT | AWAITING_PAYMENT | PAID",
+      query: "status",
+    },
+  ],
 });
 
 registerEventDates(program, {
