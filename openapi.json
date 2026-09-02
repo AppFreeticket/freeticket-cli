@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket B2B API",
-    "version": "1.5.0",
-    "description": "API REST B2B de FreeTicket para integraciones y el CLI. Autenticación por API key (header `Authorization: Bearer <key>` o `x-api-key`); el workspace activo se selecciona con el header `X-Workspace-Id`."
+    "version": "1.7.0",
+    "description": "API REST B2B de FreeTicket para integraciones y el CLI. Autenticación por API key (header `Authorization: Bearer <key>` o `x-api-key`); el workspace activo se selecciona con el header `X-Workspace-Id`.\n\nAlcances (scopes): cada key es `read` (solo GET/HEAD) o `write` (además crea, edita, borra, cancela, reembolsa y hace check-in). Las keys emitidas por autoservicio nacen `read`. Una key `read` contra un método mutante responde 403. La declaración legible por máquina está en `/.well-known/oauth-protected-resource` (RFC 9728)."
   },
   "servers": [
     {
@@ -13,6 +13,9 @@
   "security": [
     {
       "apiKey": []
+    },
+    {
+      "apiKeyHeader": []
     }
   ],
   "paths": {
@@ -27,6 +30,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -34,6 +40,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -113,6 +128,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -120,6 +138,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -145,396 +172,6 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/EventDate"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Credencial inválida o ausente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validación del cuerpo/parámetros.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/reports/exports/subscribers": {
-      "get": {
-        "operationId": "getReportsExportsSubscribers",
-        "tags": [
-          "reports"
-        ],
-        "summary": "Export de suscriptores (máx 5000)",
-        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Credencial inválida o ausente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validación del cuerpo/parámetros.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/reports/exports/reconciliation": {
-      "get": {
-        "operationId": "getReportsExportsReconciliation",
-        "tags": [
-          "reports"
-        ],
-        "summary": "Export CSV de la conciliación financiera CFO",
-        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "date_from",
-            "in": "query",
-            "required": true,
-            "description": "ISO 8601 (inicio, sobre Sale.created_at)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date_to",
-            "in": "query",
-            "required": true,
-            "description": "ISO 8601 (fin)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "match_status",
-            "in": "query",
-            "required": false,
-            "description": "Filtra por flag: OK|MISSING_INVOICE|MISSING_CUFE|AMOUNT_MISMATCH|MISSING_PAYMENT",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "description": "Filtra por payment_provider (ej: mercadopago)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Credencial inválida o ausente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validación del cuerpo/parámetros.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/settlements": {
-      "get": {
-        "operationId": "getSettlements",
-        "tags": [
-          "settlements"
-        ],
-        "summary": "Liquidaciones del workspace (pagos al organizador)",
-        "description": "Lista las liquidaciones visibles para la organización (SENT, AWAITING_PAYMENT, PAID) con su id estándar, monto, evento/función y comprobantes. Los archivos (PDF y comprobantes) se descargan desde el panel, no por esta API.",
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "event",
-            "in": "query",
-            "required": false,
-            "description": "Filtra por id de evento",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "description": "SENT|AWAITING_PAYMENT|PAID",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "description": "1..100 (default 20)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "description": "Id de la última fila de la página previa",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Settlement"
-                      }
-                    },
-                    "page": {
-                      "$ref": "#/components/schemas/Page"
-                    }
-                  },
-                  "required": [
-                    "data",
-                    "page"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Credencial inválida o ausente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validación del cuerpo/parámetros.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/reports/financials": {
-      "get": {
-        "operationId": "getReportsFinancials",
-        "tags": [
-          "reports"
-        ],
-        "summary": "Estado financiero por función: bruto, costos y neto a liquidar",
-        "description": "Una fila por función (event_date) con el desglose financiero de sus ventas confirmadas — bruto cobrado, cargo de plataforma + IVA, valor facial, comisión real de la pasarela, 4x1000 y neto a liquidar — más el estado de la liquidación asociada. Mismos números que /dashboard/liquidaciones.",
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "event",
-            "in": "query",
-            "required": false,
-            "description": "Filtra por id de evento",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "past",
-            "in": "query",
-            "required": false,
-            "description": "true = solo funciones ya ocurridas (liquidables); false = futuras",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ReportFinancialsRow"
-                      }
                     }
                   },
                   "required": [
@@ -616,6 +253,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "No se pudo generar un device_code/user_code único tras reintentar (colisión persistente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -674,6 +321,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -745,10 +406,13 @@
           "events"
         ],
         "summary": "Listar eventos del workspace",
-        "description": "Rol mínimo: `VIEWER`. Workspace activo vía header `X-Workspace-Id`.",
+        "description": "Rol mínimo: `VIEWER`. Workspace activo vía header `X-Workspace-Id`. Cada evento embebe `nextDate` (su función más próxima, o null), para no requerir `/events/{id}/dates` por evento al renderizar un catálogo.",
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -758,7 +422,8 @@
             "required": false,
             "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
@@ -775,6 +440,40 @@
             "in": "query",
             "required": false,
             "description": "Búsqueda por nombre/descripción, insensible a mayúsculas y acentos",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filtra por estado (DRAFT | PUBLISHED | SOLD_OUT | CANCELLED | COMPLETED). Se aplica en la consulta, así `limit` cuenta solo filas devueltas.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "SOLD_OUT",
+                "CANCELLED",
+                "COMPLETED"
+              ]
+            }
+          },
+          {
+            "name": "withTotal",
+            "in": "query",
+            "required": false,
+            "description": "`1` para incluir `page.total` (count sobre el mismo filtro). Opt-in: sin él no se paga la consulta extra.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -858,6 +557,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -919,6 +632,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validación del cuerpo/parámetros.",
             "content": {
@@ -943,6 +666,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -950,6 +676,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1026,6 +761,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1033,6 +771,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1119,6 +866,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1126,6 +876,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1196,6 +955,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1203,6 +965,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1257,6 +1028,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validación del cuerpo/parámetros.",
             "content": {
@@ -1281,6 +1062,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1296,6 +1080,15 @@
             "name": "dateId",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1382,6 +1175,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1397,6 +1193,15 @@
             "name": "dateId",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1467,6 +1272,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1483,14 +1291,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1574,6 +1393,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1659,6 +1492,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1666,6 +1502,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1742,6 +1587,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1749,6 +1597,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1835,6 +1692,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1842,6 +1702,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -1912,6 +1781,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -1921,7 +1793,14 @@
             "required": false,
             "description": "PENDING|CONFIRMED|ABANDONED|CANCELLED|REFUNDED",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "ABANDONED",
+                "CANCELLED",
+                "REFUNDED"
+              ]
             }
           },
           {
@@ -1930,7 +1809,13 @@
             "required": false,
             "description": "WEB|MOBILE|POS|ADMIN",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "WEB",
+                "MOBILE",
+                "POS",
+                "ADMIN"
+              ]
             }
           },
           {
@@ -1991,14 +1876,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2026,6 +1922,16 @@
                     "data",
                     "page"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida: parámetros mal formados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -2082,6 +1988,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2167,6 +2087,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2174,6 +2097,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2247,11 +2179,14 @@
         "tags": [
           "sales"
         ],
-        "summary": "Cancelar una venta",
-        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
+        "summary": "Cancelar una venta (bloqueada si el cobro sigue abierto)",
+        "description": "Marca la venta como CANCELLED, libera su cupo y suelta las sillas numeradas asociadas. IMPORTANTE: una venta PENDING cobrada con Bold tiene un enlace de pago que puede seguir vivo — el API de Bold nunca marca sus enlaces como vencidos —, así que cancelarla podría dejar al comprador pagado y sin entrada. Antes de cancelar se relee el estado real del cobro: si Bold lo reporta aprobado, responde 409 SALE_PAID_AT_GATEWAY y NO se cancela en ningún caso (esa venta se confirma o se reembolsa). Si el cobro sigue abierto o el estado no se puede leer, responde 409 OPEN_PAYMENT_CONFIRMATION_REQUIRED: verifica en el panel de Bold y repite la llamada con {\"acknowledge_open_payment\": true} para asumir el riesgo de forma explícita. Las ventas de otras pasarelas y las que no tienen un pago iniciado se cancelan sin ese paso.",
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2262,8 +2197,27 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleCancelRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -2305,6 +2259,16 @@
           },
           "404": {
             "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2332,11 +2296,14 @@
         "tags": [
           "sales"
         ],
-        "summary": "Marcar una venta como REEMBOLSADA (NO ejecuta el reembolso en MercadoPago)",
-        "description": "Marca la venta como REFUNDED y libera las sillas numeradas asociadas. IMPORTANTE: este endpoint NO dispara el reembolso real en el proveedor de pago (MercadoPago); el dinero NO se devuelve al comprador automáticamente. Un 200 aquí confirma únicamente el cambio de estado contable, no el movimiento de fondos. El reembolso en MercadoPago debe gestionarse por separado (panel de MercadoPago o su API).",
+        "summary": "Reembolsar una venta (el movimiento de fondos depende de la pasarela)",
+        "description": "Marca la venta como REFUNDED y libera las sillas numeradas asociadas. IMPORTANTE: que el dinero vuelva al comprador depende de la pasarela de pago y del medio usado. Solo las ventas cobradas con Wompi y TARJETA se anulan de verdad contra la pasarela de pago antes de marcarse. En cualquier otro caso este endpoint NO dispara el reembolso real: el dinero NO se devuelve automáticamente y un 200 confirma únicamente el cambio de estado contable. Esos reembolsos deben gestionarse por separado en el panel de la pasarela de pago. Los medios de Wompi sin devolución por API (PSE, Nequi, transferencia Bancolombia) responden 409: hay que devolver la plata en el panel de Wompi y repetir la llamada con {\"acknowledge_manual\": true} para reflejar el estado contable. Un 502 significa que la pasarela rechazó la anulación y la venta sigue CONFIRMED.",
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2347,8 +2314,27 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleRefundRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -2398,8 +2384,28 @@
               }
             }
           },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error del proveedor externo al completar la operación.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2422,6 +2428,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2429,14 +2438,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2520,6 +2540,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2605,6 +2639,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2612,6 +2649,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2688,6 +2734,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2695,6 +2744,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2781,6 +2839,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2788,6 +2849,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2858,6 +2928,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -2865,14 +2938,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -2956,6 +3040,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3041,6 +3139,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3048,6 +3149,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3124,6 +3234,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3131,6 +3244,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3217,6 +3339,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3224,6 +3349,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3290,10 +3424,13 @@
           "staff"
         ],
         "summary": "Listar staff con acceso al workspace",
-        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
+        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`. Con `?workspaceIds=` la paginación por cursor sigue siendo por usuario: `limit` cuenta personas, no filas.",
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3301,14 +3438,34 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceIds",
+            "in": "query",
+            "required": false,
+            "description": "Ids de workspace separados por comas (máx. 25). Devuelve el staff de todos ellos en una sola llamada, con cada fila etiquetada con `workspaceId`/`workspaceName` (una fila por persona y workspace). Se intersecta siempre contra los workspaces que la credencial ya puede administrar: nunca amplía su alcance. Sin el parámetro, se lista el workspace del header `X-Workspace-Id`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3392,6 +3549,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3453,8 +3624,28 @@
               }
             }
           },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes: límite de tasa excedido.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3477,6 +3668,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3484,6 +3678,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3548,6 +3751,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validación del cuerpo/parámetros.",
             "content": {
@@ -3572,6 +3785,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3580,6 +3796,22 @@
             "in": "query",
             "required": false,
             "description": "7d | 30d (default) | 90d | 1y",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d",
+                "1y"
+              ],
+              "default": "30d"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3658,6 +3890,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3703,7 +3938,8 @@
             "required": false,
             "description": "Incluir eventos/fechas en DRAFT (default false)",
             "schema": {
-              "type": "string"
+              "type": "boolean",
+              "default": false
             }
           },
           {
@@ -3711,6 +3947,21 @@
             "in": "query",
             "required": false,
             "description": "event | date | ticketType (default)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "event",
+                "date",
+                "ticketType"
+              ],
+              "default": "ticketType"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3792,6 +4043,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3819,7 +4073,14 @@
             "required": false,
             "description": "Filtra por flag: OK|MISSING_INVOICE|MISSING_CUFE|AMOUNT_MISMATCH|MISSING_PAYMENT",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "OK",
+                "MISSING_INVOICE",
+                "MISSING_CUFE",
+                "AMOUNT_MISMATCH",
+                "MISSING_PAYMENT"
+              ]
             }
           },
           {
@@ -3837,7 +4098,8 @@
             "required": false,
             "description": "Página 1-based (default 1)",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 1
             }
           },
           {
@@ -3845,6 +4107,16 @@
             "in": "query",
             "required": false,
             "description": "Tamaño de página 1..500 (default 100)",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -3915,6 +4187,130 @@
         }
       }
     },
+    "/reports/exports/reconciliation": {
+      "get": {
+        "operationId": "getReportsExportsReconciliation",
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export CSV de la conciliación financiera CFO",
+        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "description": "ISO 8601 (inicio, sobre Sale.created_at)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "description": "ISO 8601 (fin)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "match_status",
+            "in": "query",
+            "required": false,
+            "description": "Filtra por flag: OK|MISSING_INVOICE|MISSING_CUFE|AMOUNT_MISMATCH|MISSING_PAYMENT",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OK",
+                "MISSING_INVOICE",
+                "MISSING_CUFE",
+                "AMOUNT_MISMATCH",
+                "MISSING_PAYMENT"
+              ]
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "description": "Filtra por payment_provider (ej: mercadopago)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reports/exports/attendees": {
       "get": {
         "operationId": "getReportsExportsAttendees",
@@ -3926,6 +4322,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -3970,6 +4369,22 @@
             "in": "query",
             "required": false,
             "description": "PENDING|CONFIRMED|ABANDONED|CANCELLED|REFUNDED (default CONFIRMED)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "ABANDONED",
+                "CANCELLED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4040,6 +4455,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4084,6 +4502,103 @@
             "in": "query",
             "required": false,
             "description": "PENDING|CONFIRMED|ABANDONED|CANCELLED|REFUNDED (default CONFIRMED)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "ABANDONED",
+                "CANCELLED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/exports/subscribers": {
+      "get": {
+        "operationId": "getReportsExportsSubscribers",
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export de suscriptores (máx 5000)",
+        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4154,6 +4669,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4180,6 +4698,22 @@
             "in": "query",
             "required": false,
             "description": "PENDING|CONFIRMED (default)|ABANDONED|CANCELLED|REFUNDED",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "ABANDONED",
+                "CANCELLED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4261,6 +4795,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4270,7 +4807,12 @@
             "required": true,
             "description": "day | week | month",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
             }
           },
           {
@@ -4296,6 +4838,15 @@
             "in": "query",
             "required": false,
             "description": "ID de evento del workspace (opcional)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4366,6 +4917,450 @@
         }
       }
     },
+    "/reports/financials": {
+      "get": {
+        "operationId": "getReportsFinancials",
+        "tags": [
+          "reports"
+        ],
+        "summary": "Estado financiero por función: bruto, costos y neto a liquidar",
+        "description": "Una fila por función (event_date) con el desglose financiero de sus ventas confirmadas — bruto cobrado, cargo de plataforma + IVA, valor facial, comisión de la pasarela (real en MercadoPago, estimada por tasa en Wompi o Bold), 4x1000 y neto a liquidar — más el estado de la liquidación asociada. Si wompiSalesWithoutRate > 0, la comisión de ventas de Wompi o Bold no se pudo estimar y el neto está inflado.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "description": "Filtra por id de evento",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "past",
+            "in": "query",
+            "required": false,
+            "description": "true = solo funciones ya ocurridas (liquidables); false = futuras",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReportFinancialsRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settlements": {
+      "get": {
+        "operationId": "getSettlements",
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Liquidaciones del workspace (pagos al organizador)",
+        "description": "Lista las liquidaciones visibles para la organización (SENT, AWAITING_PAYMENT, PAID) con su id estándar, monto, evento/función y comprobantes. Los archivos se bajan con `GET /settlements/{id}/document` (PDF) y `GET /settlements/{id}/proofs/{fileName}` (comprobantes de la transferencia).",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "description": "Filtra por id de evento",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "SENT|AWAITING_PAYMENT|PAID",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SENT",
+                "AWAITING_PAYMENT",
+                "PAID"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1..100 (default 20)",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Id de la última fila de la página previa",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Settlement"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settlements/{id}/document": {
+      "get": {
+        "operationId": "getSettlementsIdDocument",
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Descarga el PDF de una liquidación",
+        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`. Los archivos viven en un bucket privado, así que la respuesta es un **302** hacia una URL firmada de 5 minutos (hay que seguir la redirección; el `storage_path` nunca se expone). Solo liquidaciones visibles para la organización (SENT, AWAITING_PAYMENT, PAID) y dentro del `event_scope` de la key.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirección a la URL firmada (TTL 5 min) del PDF, con Content-Disposition attachment."
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente (< ADMIN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Liquidación inexistente, de otra organización, fuera de alcance, o todavía sin documento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "No se pudo firmar la URL en el storage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage no configurado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settlements/{id}/proofs/{fileName}": {
+      "get": {
+        "operationId": "getSettlementsIdProofsFileName",
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Descarga un comprobante de pago de una liquidación",
+        "description": "Rol mínimo: `ADMIN`. Workspace activo vía header `X-Workspace-Id`. `fileName` es el mismo valor que devuelve `paymentProofs[].fileName` en `GET /settlements` (URL-encoded). Igual que `/document`, responde **302** hacia una URL firmada de 5 minutos del bucket privado.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirección a la URL firmada (TTL 5 min) del comprobante, con Content-Disposition attachment."
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente (< ADMIN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Liquidación inexistente, de otra organización, fuera de alcance, o sin un comprobante con ese nombre.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "No se pudo firmar la URL en el storage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage no configurado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/discounts": {
       "get": {
         "operationId": "getDiscounts",
@@ -4377,6 +5372,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4395,11 +5393,21 @@
             "required": false,
             "description": "true|false",
             "schema": {
-              "type": "string"
+              "type": "boolean"
             }
           },
           {
             "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
@@ -4407,9 +5415,10 @@
             }
           },
           {
-            "name": "cursor",
-            "in": "query",
+            "name": "X-Workspace-Id",
+            "in": "header",
             "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4493,6 +5502,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4554,6 +5577,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validación del cuerpo/parámetros.",
             "content": {
@@ -4578,6 +5611,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4585,6 +5621,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4671,6 +5716,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4678,6 +5726,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4748,6 +5805,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4755,14 +5815,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -4846,6 +5917,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4931,6 +6016,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -4938,6 +6026,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5009,6 +6106,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5026,11 +6126,28 @@
             "required": false,
             "description": "PENDING|ACTIVE|EXPIRED|CANCELLED|PAUSED",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "ACTIVE",
+                "EXPIRED",
+                "CANCELLED",
+                "PAUSED"
+              ]
             }
           },
           {
             "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
@@ -5038,9 +6155,10 @@
             }
           },
           {
-            "name": "cursor",
-            "in": "query",
+            "name": "X-Workspace-Id",
+            "in": "header",
             "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5127,6 +6245,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5134,6 +6255,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5212,6 +6342,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5219,6 +6352,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5300,6 +6442,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5307,6 +6452,15 @@
             "name": "ticketCode",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5385,6 +6539,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5392,6 +6549,15 @@
             "name": "ticketCode",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5470,6 +6636,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5477,6 +6646,15 @@
             "name": "ticketCode",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5555,6 +6733,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5562,14 +6743,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5653,6 +6845,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5738,6 +6944,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5745,6 +6954,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5815,6 +7033,20 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5890,6 +7122,9 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "parameters": [
@@ -5897,14 +7132,25 @@
             "name": "limit",
             "in": "query",
             "required": false,
+            "description": "1-100, default 20",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 20
             }
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
             "schema": {
               "type": "string"
             }
@@ -5979,6 +7225,289 @@
         }
       }
     },
+    "/customer/tickets/{id}": {
+      "get": {
+        "operationId": "getCustomerTicketsId",
+        "tags": [
+          "customer"
+        ],
+        "summary": "Detalle de una entrada del comprador (deep link)",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. `{id}` acepta el id de la venta o su `reference`. Devuelve 404 si la entrada no es del comprador de la sesión o cae fuera del alcance del workspace de la key.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerSale"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/tickets/{id}/cancel": {
+      "post": {
+        "operationId": "postCustomerTicketsIdCancel",
+        "tags": [
+          "customer"
+        ],
+        "summary": "Cancelar la propia compra (solo si aún no fue pagada)",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. Solo cancela ventas PENDING (libera cupo y sillas). Una venta CONFIRMED responde 409 con código `REFUND_REQUIRED`: el reembolso lo gestiona el organizador. `{id}` acepta el id de la venta o su `reference`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerTicketCancelResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/logout": {
+      "post": {
+        "operationId": "postCustomerLogout",
+        "tags": [
+          "customer"
+        ],
+        "summary": "Cerrar la sesión de comprador (SSO headless)",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. Borra la sesión del comprador: el `session_token` deja de servir en el acto. Idempotente.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerLogout"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/customer-auth/enterprise-exchange": {
       "post": {
         "operationId": "postApiCustomerAuthEnterpriseExchange",
@@ -5990,12 +7519,26 @@
         "security": [
           {
             "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
           }
         ],
         "servers": [
           {
             "url": "/",
             "description": "Host canónico (fuera de /api/v1)"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -6027,6 +7570,1009 @@
           },
           "422": {
             "description": "Cuerpo inválido."
+          }
+        }
+      }
+    },
+    "/customer/membership": {
+      "get": {
+        "operationId": "getCustomerMembership",
+        "tags": [
+          "customer"
+        ],
+        "summary": "Estado de membresía del comprador en el workspace de la key",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. `active` es true solo con membresía ACTIVE y vigente. Si no hay ninguna vigente, `membership` trae la más reciente (vencida, cancelada o pendiente de pago) para que la landing elija el CTA; `null` = nunca fue miembro de este workspace.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerMembershipState"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/subscriptions": {
+      "post": {
+        "operationId": "postCustomerSubscriptions",
+        "tags": [
+          "customer",
+          "subscriptions"
+        ],
+        "summary": "Iniciar el alta de una membresía (devuelve la URL de pago)",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. Valida que el plan pertenezca al workspace de la key y que el comprador pueda adquirirlo, y devuelve la URL del checkout de membresía del host canónico (el cobro lo cierra la plataforma). Al volver, releer `GET /customer/membership`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerSubscribeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerSubscribeResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/subscriptions/cancel": {
+      "post": {
+        "operationId": "postCustomerSubscriptionsCancel",
+        "tags": [
+          "customer",
+          "subscriptions"
+        ],
+        "summary": "Cancelar la propia membresía (SSO headless)",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. La membresía se resuelve por la sesión del comprador y el workspace de la key (no se acepta ningún id). Cancela primero el cobro recurrente en el proveedor y después marca la membresía como CANCELLED. Idempotente.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerSubscriptionCancelResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/profile": {
+      "get": {
+        "operationId": "getCustomerProfile",
+        "tags": [
+          "customer"
+        ],
+        "summary": "Perfil del comprador (nombre y teléfono)",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerProfile"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchCustomerProfile",
+        "tags": [
+          "customer"
+        ],
+        "summary": "Editar el perfil del comprador",
+        "description": "Requiere API key de servicio enterprise Y el header `X-Customer-Session`. Edita solo al comprador de la sesión: nombre y teléfono. El correo no se edita (es la identidad de la cuenta). Campos ausentes no se tocan.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerProfile"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/content/videos": {
+      "get": {
+        "operationId": "getContentVideos",
+        "tags": [
+          "content"
+        ],
+        "summary": "Listar los videos publicados de la organización",
+        "description": "Solo videos publicados y con procesamiento terminado (READY) del workspace activo. No incluye el playback id: para reproducir hay que pedir un token en `POST /content/playback-token`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContentVideo"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/content/posts": {
+      "get": {
+        "operationId": "getContentPosts",
+        "tags": [
+          "content"
+        ],
+        "summary": "Listar el feed de comunidad de la organización",
+        "description": "Publicaciones del workspace activo, de la más reciente a la más vieja, sin borradas ni programadas a futuro. Un post con `locked: true` llega redactado (`content`, `imageUrl`, `videoId`, `eventId` y `link` en null, `commentsCount` en 0): es contenido reservado a miembros y la key no representa a un comprador con membresía vigente. No incluye `likes_count` (solo visible para el dueño del workspace) ni el autor interno de la publicación.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContentPost"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/content/lives": {
+      "get": {
+        "operationId": "getContentLives",
+        "tags": [
+          "content"
+        ],
+        "summary": "Listar las transmisiones de la organización",
+        "description": "Transmisiones del workspace activo, de la más reciente a la más vieja. `status: ACTIVE` es la que está al aire. No incluye la clave RTMP ni los playback ids.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContentLive"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/content/lives/{id}": {
+      "get": {
+        "operationId": "getContentLivesId",
+        "tags": [
+          "content"
+        ],
+        "summary": "Estado de una transmisión",
+        "description": "Rol mínimo: `VIEWER`. Workspace activo vía header `X-Workspace-Id`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ContentLive"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/content/playback-token": {
+      "post": {
+        "operationId": "postContentPlaybackToken",
+        "tags": [
+          "content"
+        ],
+        "summary": "Token firmado para reproducir un video o una transmisión",
+        "description": "Requiere API key de servicio enterprise. El contenido `memberOnly` exige además el header `X-Customer-Session` de un comprador con membresía vigente en la organización de la key (si no, 403 `MEMBERSHIP_REQUIRED`). El contenido de otra organización responde 404. Tokens de vida corta: 30 minutos en vivo, 1 hora en video.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Workspace activo a operar. Opcional: sin él, se usa el workspace por defecto del usuario dueño de la key (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentPlaybackTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ContentPlaybackToken"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credencial inválida o ausente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol insuficiente o recurso no accesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o fuera de alcance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación del cuerpo/parámetros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -6075,6 +8621,11 @@
           },
           "hasMore": {
             "type": "boolean"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -6103,6 +8654,53 @@
         ],
         "additionalProperties": false
       },
+      "WorkspaceAccess": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "SUPER_ADMIN",
+              "ADMIN",
+              "STAFF",
+              "VIEWER",
+              "MINCULTURA"
+            ],
+            "description": "Rol efectivo del usuario EN ESTE workspace."
+          },
+          "sections": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Secciones habilitadas (slugs). null = sin acotar; [] = acceso vencido o revocado."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "role",
+          "sections"
+        ],
+        "additionalProperties": false
+      },
       "Me": {
         "type": "object",
         "properties": {
@@ -6123,7 +8721,8 @@
               "STAFF",
               "VIEWER",
               "MINCULTURA"
-            ]
+            ],
+            "description": "DEPRECADO: rol efectivo en el workspace ACTIVO. Usa el `role` de cada fila de `workspaces`. Se conserva por compatibilidad con los clientes ya publicados."
           },
           "activeWorkspaceId": {
             "type": "string"
@@ -6131,7 +8730,7 @@
           "workspaces": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Workspace"
+              "$ref": "#/components/schemas/WorkspaceAccess"
             }
           }
         },
@@ -6377,6 +8976,59 @@
         ],
         "additionalProperties": false
       },
+      "EventNextDate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SOLD_OUT",
+              "CANCELLED",
+              "COMPLETED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "startsAt",
+          "endsAt",
+          "timezone",
+          "status"
+        ],
+        "additionalProperties": false
+      },
       "Event": {
         "type": "object",
         "properties": {
@@ -6487,6 +9139,16 @@
             "enum": [
               "owner",
               "artist"
+            ]
+          },
+          "nextDate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventNextDate"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "createdAt": {
@@ -6807,7 +9469,8 @@
                 },
                 "timezone": {
                   "default": "America/Bogota",
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "required": [
@@ -6911,7 +9574,8 @@
           },
           "timezone": {
             "default": "America/Bogota",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "venueId": {
             "anyOf": [
@@ -6974,7 +9638,8 @@
             ]
           },
           "timezone": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "venueId": {
             "anyOf": [
@@ -7118,6 +9783,16 @@
                 "type": "null"
               }
             ]
+          },
+          "seatLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -7127,7 +9802,8 @@
           "unitPrice",
           "subtotal",
           "ticketCode",
-          "checkedInAt"
+          "checkedInAt",
+          "seatLabel"
         ],
         "additionalProperties": false
       },
@@ -7422,6 +10098,7 @@
             "enum": [
               "MONTHLY",
               "QUARTERLY",
+              "SEMIANNUAL",
               "ANNUAL",
               "LIFETIME"
             ]
@@ -7504,6 +10181,7 @@
             "enum": [
               "MONTHLY",
               "QUARTERLY",
+              "SEMIANNUAL",
               "ANNUAL",
               "LIFETIME"
             ]
@@ -7583,6 +10261,7 @@
             "enum": [
               "MONTHLY",
               "QUARTERLY",
+              "SEMIANNUAL",
               "ANNUAL",
               "LIFETIME"
             ]
@@ -7749,6 +10428,12 @@
                 "type": "null"
               }
             ]
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "workspaceName": {
+            "type": "string"
           },
           "createdAt": {
             "type": "string"
@@ -8042,6 +10727,278 @@
         ],
         "additionalProperties": false
       },
+      "SaleCreate": {
+        "type": "object",
+        "properties": {
+          "buyer": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "name",
+              "email"
+            ],
+            "additionalProperties": false
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ticketTypeId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "seats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "required": [
+                "ticketTypeId",
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "channel": {
+            "default": "ADMIN",
+            "type": "string",
+            "enum": [
+              "WEB",
+              "MOBILE",
+              "POS",
+              "ADMIN"
+            ]
+          },
+          "comp": {
+            "default": false,
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "buyer",
+          "items",
+          "channel",
+          "comp"
+        ],
+        "additionalProperties": false
+      },
+      "SaleCancelRequest": {
+        "type": "object",
+        "properties": {
+          "acknowledge_open_payment": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaleRefundRequest": {
+        "type": "object",
+        "properties": {
+          "acknowledge_manual": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportByEventRow": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "eventName": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number"
+          },
+          "ticketsSold": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "salesCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "available": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "eventId",
+          "eventName",
+          "revenue",
+          "ticketsSold",
+          "salesCount",
+          "available"
+        ],
+        "additionalProperties": false
+      },
+      "ReportTimeseriesRow": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number"
+          },
+          "ticketsSold": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "salesCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "bucket",
+          "revenue",
+          "ticketsSold",
+          "salesCount"
+        ],
+        "additionalProperties": false
+      },
+      "ReportFinancialsRow": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "eventName": {
+            "type": "string"
+          },
+          "eventDateId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "past": {
+            "type": "boolean"
+          },
+          "unitsSold": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "gross": {
+            "type": "number"
+          },
+          "platformFee": {
+            "type": "number"
+          },
+          "facial": {
+            "type": "number"
+          },
+          "paymentFee": {
+            "type": "number"
+          },
+          "wompiSalesWithoutRate": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "gmf": {
+            "type": "number"
+          },
+          "net": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "settlementStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "SENT",
+                  "AWAITING_PAYMENT",
+                  "PAID"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settlementId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settlementAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "eventId",
+          "eventName",
+          "eventDateId",
+          "startsAt",
+          "past",
+          "unitsSold",
+          "gross",
+          "platformFee",
+          "facial",
+          "paymentFee",
+          "wompiSalesWithoutRate",
+          "gmf",
+          "net",
+          "currency",
+          "settlementStatus",
+          "settlementId",
+          "settlementAmount"
+        ],
+        "additionalProperties": false
+      },
       "Settlement": {
         "type": "object",
         "properties": {
@@ -8238,247 +11195,6 @@
           "requestedAt",
           "paidAt",
           "createdAt"
-        ],
-        "additionalProperties": false
-      },
-      "ReportFinancialsRow": {
-        "type": "object",
-        "properties": {
-          "eventId": {
-            "type": "string"
-          },
-          "eventName": {
-            "type": "string"
-          },
-          "eventDateId": {
-            "type": "string"
-          },
-          "startsAt": {
-            "type": "string"
-          },
-          "past": {
-            "type": "boolean"
-          },
-          "unitsSold": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "gross": {
-            "type": "number"
-          },
-          "platformFee": {
-            "type": "number"
-          },
-          "facial": {
-            "type": "number"
-          },
-          "paymentFee": {
-            "type": "number"
-          },
-          "gmf": {
-            "type": "number"
-          },
-          "net": {
-            "type": "number"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "settlementStatus": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "SENT",
-                  "AWAITING_PAYMENT",
-                  "PAID"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "settlementId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "settlementAmount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "eventId",
-          "eventName",
-          "eventDateId",
-          "startsAt",
-          "past",
-          "unitsSold",
-          "gross",
-          "platformFee",
-          "facial",
-          "paymentFee",
-          "gmf",
-          "net",
-          "currency",
-          "settlementStatus",
-          "settlementId",
-          "settlementAmount"
-        ],
-        "additionalProperties": false
-      },
-      "SaleCreate": {
-        "type": "object",
-        "properties": {
-          "buyer": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "minLength": 1
-              },
-              "email": {
-                "type": "string",
-                "format": "email",
-                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-              },
-              "phone": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": [
-              "name",
-              "email"
-            ],
-            "additionalProperties": false
-          },
-          "items": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "ticketTypeId": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "quantity": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "ticketTypeId",
-                "quantity"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "channel": {
-            "default": "ADMIN",
-            "type": "string",
-            "enum": [
-              "WEB",
-              "MOBILE",
-              "POS",
-              "ADMIN"
-            ]
-          },
-          "comp": {
-            "default": false,
-            "type": "boolean"
-          },
-          "notes": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "buyer",
-          "items",
-          "channel",
-          "comp"
-        ],
-        "additionalProperties": false
-      },
-      "ReportByEventRow": {
-        "type": "object",
-        "properties": {
-          "eventId": {
-            "type": "string"
-          },
-          "eventName": {
-            "type": "string"
-          },
-          "revenue": {
-            "type": "number"
-          },
-          "ticketsSold": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "salesCount": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "available": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          }
-        },
-        "required": [
-          "eventId",
-          "eventName",
-          "revenue",
-          "ticketsSold",
-          "salesCount",
-          "available"
-        ],
-        "additionalProperties": false
-      },
-      "ReportTimeseriesRow": {
-        "type": "object",
-        "properties": {
-          "bucket": {
-            "type": "string"
-          },
-          "revenue": {
-            "type": "number"
-          },
-          "ticketsSold": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "salesCount": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          }
-        },
-        "required": [
-          "bucket",
-          "revenue",
-          "ticketsSold",
-          "salesCount"
         ],
         "additionalProperties": false
       },
@@ -9249,13 +11965,18 @@
           },
           "emailVerified": {
             "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Vencimiento de la sesión de comprador (ISO 8601)."
           }
         },
         "required": [
           "id",
           "email",
           "name",
-          "emailVerified"
+          "emailVerified",
+          "expiresAt"
         ],
         "additionalProperties": false
       },
@@ -9365,6 +12086,39 @@
         ],
         "additionalProperties": false
       },
+      "CustomerTicketCancelResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerLogout": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "boolean",
+            "description": "true si la sesión existía y fue borrada; false si el token ya no era válido (igual queda cerrada)."
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "additionalProperties": false
+      },
       "EnterpriseExchangeRequest": {
         "type": "object",
         "properties": {
@@ -9422,6 +12176,544 @@
           "customer"
         ],
         "additionalProperties": false
+      },
+      "CustomerMembershipState": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "true solo con membresía ACTIVE y vigente en este workspace."
+          },
+          "membership": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING",
+                      "ACTIVE",
+                      "EXPIRED",
+                      "CANCELLED",
+                      "PAUSED"
+                    ]
+                  },
+                  "plan": {
+                    "$ref": "#/components/schemas/MembershipPlan"
+                  },
+                  "startedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "expiresAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "null = LIFETIME o membresía sin vencimiento."
+                  },
+                  "autoRenew": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "status",
+                  "plan",
+                  "startedAt",
+                  "expiresAt",
+                  "autoRenew"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "membership"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerSubscribeRequest": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id de un MembershipPlan activo del workspace de la key."
+          }
+        },
+        "required": [
+          "planId"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerSubscribeResult": {
+        "type": "object",
+        "properties": {
+          "checkoutUrl": {
+            "type": "string",
+            "description": "URL del checkout de membresía en el host canónico. La landing debe redirigir al comprador ahí."
+          },
+          "planId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkoutUrl",
+          "planId"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerSubscriptionCancelResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "ACTIVE",
+              "EXPIRED",
+              "CANCELLED",
+              "PAUSED"
+            ]
+          },
+          "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "cancelledAt"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "phone"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerProfileUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "phone": {
+            "description": "null o cadena vacía borran el teléfono.",
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ContentVideo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "durationSeconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posterUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberOnly": {
+            "type": "boolean",
+            "description": "true = solo miembros vigentes de la organización pueden reproducirlo."
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "durationSeconds",
+          "posterUrl",
+          "series",
+          "memberOnly",
+          "publishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ContentPost": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "VIDEO"
+            ]
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "imageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "videoId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Post de tipo VIDEO: id del ContentVideo, para cruzar con `GET /content/videos`."
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "true = post reservado a miembros vigentes; su contenido llega redactado."
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "imageUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "domain": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "title",
+                  "description",
+                  "imageUrl",
+                  "domain"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snapshot Open Graph del primer link del texto."
+          },
+          "commentsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "publishedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "imageUrl",
+          "videoId",
+          "eventId",
+          "locked",
+          "link",
+          "commentsCount",
+          "publishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ContentLive": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IDLE",
+              "ACTIVE",
+              "COMPLETED",
+              "DISABLED"
+            ],
+            "description": "ACTIVE = transmitiendo ahora (banner en vivo)."
+          },
+          "memberOnly": {
+            "type": "boolean"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasRecording": {
+            "type": "boolean",
+            "description": "true si quedó grabación reproducible tras la transmisión."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "memberOnly",
+          "startedAt",
+          "endedAt",
+          "hasRecording"
+        ],
+        "additionalProperties": false
+      },
+      "ContentPlaybackTokenRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "video",
+              "live"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "ContentPlaybackToken": {
+        "type": "object",
+        "properties": {
+          "playbackId": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "playback": {
+                "type": "string"
+              },
+              "drm": {
+                "type": "string"
+              },
+              "thumbnail": {
+                "type": "string"
+              },
+              "storyboard": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "playback",
+              "drm"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "playbackId",
+          "tokens"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
@@ -9429,7 +12721,13 @@
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "API key con prefijo `Bearer `. Alternativa: header `x-api-key` con la key cruda."
+        "description": "API key con prefijo `Bearer `. Alternativa: header `x-api-key` con la key cruda. Alcances disponibles: `read` y `write` (ver `/.well-known/oauth-protected-resource`)."
+      },
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key cruda (sin `Bearer `), alternativa a `Authorization`."
       }
     }
   }

@@ -79,7 +79,7 @@ ft sales list --status CONFIRMED --json
 | `ft whoami` | Active user and accessible workspaces | VIEWER |
 | `ft config` · `ft logout` | Show config (masked key) · remove key | — |
 | `ft workspace list` · `use <id\|slug>` · `show` | List, switch, and show the active workspace | VIEWER |
-| `ft events list` · `get <id>` | Workspace events | VIEWER |
+| `ft events list` · `get <id>` | Workspace events (`--q` `--status` `--with-total`) | VIEWER |
 | `ft events create` · `update <id>` · `delete <id>` | Manage events (`--data <json>`) | ADMIN |
 | `ft events publish <id>` | Publish an event | ADMIN |
 | `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
@@ -87,7 +87,7 @@ ft sales list --status CONFIRMED --json
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
 | `ft sales list` · `get <id>` | Sales (filters: `--status` `--channel` `--event` `--event-date` `--reference` `--buyer` `--from` `--to`) | STAFF |
 | `ft sales create` | Create a sale/order — comps & programmatic sales (`--data <json>`) | ADMIN |
-| `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for partial refund) | ADMIN |
+| `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for the partial amount and for the `acknowledge_open_payment` / `acknowledge_manual` flags) | ADMIN |
 | `ft sales tickets <id>` | List the individual tickets/attendees of a sale | STAFF |
 | `ft tickets access <code>` | Read a ticket's access status (no admit) | STAFF |
 | `ft tickets checkin <code>` | Admit a ticket at the door (idempotent) | STAFF |
@@ -100,10 +100,14 @@ ft sales list --status CONFIRMED --json
 | `ft webhooks list` · `create` · `delete <id>` | Webhook endpoints, HMAC-signed delivery (`--data <json>`) | ADMIN |
 | `ft venues list` · `get <id>` | Venues | VIEWER |
 | `ft venues create` · `update <id>` · `delete <id>` | Manage venues (`--data <json>`) | ADMIN |
-| `ft staff list` · `create` · `set-role <id>` | Workspace staff (`--data <json>`) | ADMIN |
+| `ft staff list` · `create` · `set-role <id>` | Workspace staff (`--workspace-ids <ids>` lists up to 25 workspaces in one call; `--data <json>`) | ADMIN |
 | `ft reports summary` | KPIs (`--period 7d\|30d\|90d\|1y`) | VIEWER |
 | `ft reports by-event` · `timeseries` · `inventory` | Revenue/tickets by event, over time, and capacity/availability | VIEWER |
-| `ft reports export buyers\|attendees\|subscribers` | Export buyers / attendees / subscribers (CSV; filters `--event` `--event-date` `--from` `--to` `--status`) | ADMIN |
+| `ft reports export buyers\|attendees\|subscribers\|reconciliation` | Exports as CSV (filters `--event` `--event-date` `--from` `--to` `--status`) | ADMIN |
+| `ft reports reconciliation` · `financials` | CFO reconciliation (Mercado Pago vs sale vs Siigo invoice) · per-function P&L | ADMIN |
+| `ft settlements list` · `document <id>` | Settlements paid to the organizer · signed download URL for the PDF, 5 min TTL (`--proof <fileName>` for a payment proof) | ADMIN |
+| `ft api-keys create <name>` · `list` · `revoke <id>` | Self-service API keys (the secret is shown once, never stored) | ADMIN |
+| `ft admin login` · `me` · `workspaces` · `users` · `plans` · `feature-flags` · `tokens` · `audit-log` | Superadmin, cross-tenant — needs a SUPER_ADMIN session, not an API key. Includes `admin workspaces plan <id>` (assisted plan assignment) and `webTemplate` / `customDomain` on `update` | SUPER_ADMIN |
 
 > **Write operations** (`create`/`update`/`delete` and actions like `publish`,
 > `cancel`, `refund`) send a JSON body via `--data <inline-json>` or

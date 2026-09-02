@@ -55,7 +55,9 @@ import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
 import { registerWorkspace } from "./commands/workspace";
+import { configureClient, signedDownload } from "./lib/api";
 import { banner } from "./lib/banner";
+import { print } from "./lib/output";
 import { notifyUpdate } from "./lib/update-check";
 
 const program = new Command();
@@ -82,12 +84,24 @@ registerResource(program, {
   ],
   // startsAt lives on EventDate, not Event — use createdAt for a temporal column.
   columns: ["id", "name", "status", "createdAt"],
-  listFlags: [{ flag: "--q <text>", describe: "search by name", query: "q" }],
+  listFlags: [
+    { flag: "--q <text>", describe: "search by name", query: "q" },
+    {
+      flag: "--status <s>",
+      describe: "DRAFT | PUBLISHED | SOLD_OUT | CANCELLED | COMPLETED",
+      query: "status",
+    },
+    {
+      flag: "--with-total",
+      describe: "include page.total (opt-in: costs an extra count query)",
+      query: "withTotal",
+    },
+  ],
 });
 
 // Read-only: settlements are created by FreeTicket, never by the organizer.
-// The PDF/comprobante is still panel-only — the contract exposes hasDocument
-// and the file names, not a download URL (see CONTRACT-GAPS.md).
+// The PDF and the payment proofs download through `ft settlements document`
+// (contract 1.7.0): the API answers 302 with a 5-minute signed URL.
 registerResource(program, {
   name: "settlements",
   describe: "Settlements paid to the organizer",
@@ -101,6 +115,21 @@ registerResource(program, {
       query: "status",
     },
   ],
+  extend: (root) => {
+    root
+      .command("document <id>")
+      .description("Signed download URL for the settlement PDF (5 min TTL)")
+      .option("--proof <fileName>", "download a payment proof instead")
+      .option("--workspace <id>", "workspace override")
+      .option("--json", "raw JSON output")
+      .action(async (id, opts) => {
+        configureClient(opts.workspace);
+        const path = opts.proof
+          ? `/settlements/${id}/proofs/${encodeURIComponent(opts.proof)}`
+          : `/settlements/${id}/document`;
+        print(await signedDownload(path), { json: opts.json });
+      });
+  },
 });
 
 registerEventDates(program, {
@@ -117,7 +146,13 @@ registerResource(program, {
   get: getSalesId,
   create: postSales,
   actions: [
-    { name: "cancel", describe: "Cancel a sale", fn: postSalesIdCancel },
+    {
+      name: "cancel",
+      describe:
+        "Cancel a sale (--data '{\"acknowledge_open_payment\":true}' if the payment is still open)",
+      fn: postSalesIdCancel,
+      body: true,
+    },
     {
       name: "refund",
       describe: "Refund a sale (--data for partial amount)",
@@ -262,7 +297,15 @@ registerResource(program, {
       body: true,
     },
   ],
-  columns: ["id", "name", "email", "role"],
+  columns: ["id", "name", "email", "role", "workspaceName"],
+  listFlags: [
+    {
+      flag: "--workspace-ids <ids>",
+      describe:
+        "comma-separated workspace ids (max 25): staff of all of them in one call",
+      query: "workspaceIds",
+    },
+  ],
 });
 
 registerTickets(program);

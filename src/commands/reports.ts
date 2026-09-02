@@ -78,7 +78,12 @@ export function registerReports(program: Command): void {
         await getReportsFinancials({
           query: {
             event: opts.event,
-            past: opts.past === undefined ? undefined : String(opts.past),
+            past:
+              opts.past === undefined
+                ? undefined
+                : opts.past
+                  ? "true"
+                  : "false",
           },
         }),
       );

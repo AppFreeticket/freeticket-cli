@@ -24,15 +24,25 @@ export function registerWorkspace(program: Command): void {
       configureClient();
       const me = unwrap(await getMe({})).data;
       const activeId = loadConfig().workspaceId ?? me.activeWorkspaceId;
+      // `role` is the EFFECTIVE role in that workspace (contract 1.7.0), not
+      // the account-wide one: the same session can be ADMIN here and VIEWER
+      // there. `sections`: null = unrestricted, [] = access expired or revoked.
       const rows = me.workspaces.map((w) => ({
         active: w.id === activeId ? "*" : "",
         id: w.id,
         name: w.name,
         slug: w.slug,
+        role: w.role,
+        access:
+          w.sections === null
+            ? "full"
+            : w.sections.length === 0
+              ? "revoked"
+              : w.sections.join("|"),
       }));
       print(rows, {
         json: opts.json,
-        columns: ["active", "id", "name", "slug"],
+        columns: ["active", "id", "name", "slug", "role", "access"],
       });
     });
 

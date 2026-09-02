@@ -21,6 +21,7 @@ import {
   postPlatformPlans,
   postTokens,
   postWorkspaces,
+  postWorkspacesIdPlan,
   postWorkspacesIdRestore,
   postWorkspacesIdSuspend,
   putFeatureFlagsKey,
@@ -176,6 +177,17 @@ export function registerAdmin(program: Command): void {
           name: "restore",
           describe: "Restore a suspended workspace",
           fn: postWorkspacesIdRestore,
+        },
+        {
+          // Assisted sale: activates a tier without going through Stripe
+          // self-service. If the tenant had a Stripe subscription it is
+          // cancelled there first; a failure there aborts with 409.
+          name: "plan",
+          describe:
+            'Assign a platform plan manually (--data \'{"planSlug":"spark|star|icon|legend"}\')',
+          fn: postWorkspacesIdPlan,
+          body: true,
+          confirm: true,
         },
       ],
       columns: ["id", "name", "type", "country", "suspended", "createdAt"],

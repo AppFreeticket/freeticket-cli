@@ -37,6 +37,8 @@ interface ResourceSpec {
   columns?: string[];
   /** Extra list flags -> query entries. Example: status, eventDateId. */
   listFlags?: { flag: string; describe: string; query: string }[];
+  /** Commands that don't fit the CRUD shape (extra args, non-JSON responses). */
+  extend?: (root: Command) => void;
 }
 
 /**
@@ -194,6 +196,8 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       print(body?.data ?? body ?? { ok: true, id }, { json: opts.json });
     });
   }
+
+  spec.extend?.(root);
 }
 
 function camel(s: string): string {
