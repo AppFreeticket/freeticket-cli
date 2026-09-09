@@ -23,7 +23,7 @@ test("env vars toman precedencia y se resuelven", () => {
   });
 });
 
-test("apiUrl cae al default cuando no hay env ni archivo", () => {
+test("apiUrl falls back to the default with no env and no file", () => {
   // Asume sin ~/.freeticket/config.json en el entorno de CI.
   const cfg = loadConfig();
   expect(cfg.apiUrl).toBe("https://admin.appfreeticket.com");
