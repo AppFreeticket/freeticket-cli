@@ -5,6 +5,14 @@ interface PrintOpts {
   json?: boolean;
   /** Columns to show in table mode (order). Inferred from the first object if omitted. */
   columns?: string[];
+  /**
+   * The user typed `--columns` explicitly, so honor it in JSON mode too.
+   * Without this, `--columns id,name --json` silently dumped every field:
+   * `--columns` worked for tables and CSV but not for the one output format an
+   * agent actually reads. The curated default stays out of JSON on purpose —
+   * trimming it silently would break `| jq` pipelines that expect whole rows.
+   */
+  columnsExplicit?: boolean;
 }
 
 /**
@@ -13,7 +21,13 @@ interface PrintOpts {
  */
 export function print(data: unknown, opts: PrintOpts = {}): void {
   if (opts.json) {
-    process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+    const out =
+      opts.columnsExplicit && opts.columns && Array.isArray(data)
+        ? (data as Record<string, unknown>[]).map((row) =>
+            pick(row, opts.columns as string[]),
+          )
+        : data;
+    process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
     return;
   }
   if (Array.isArray(data) && data.every(isPlainRow)) {
@@ -90,4 +104,30 @@ function fmt(v: unknown): string {
   if (v === null || v === undefined) return chalk.dim("—");
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+function pick(
+  row: Record<string, unknown>,
+  columns: string[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const c of columns) if (c in row) out[c] = row[c];
+  return out;
+}
+
+/**
+ * An empty list does not say why it is empty. For a human that is fine - they
+ * know which workspace they are in. For an agent it is a silent dead end: the
+ * response is syntactically valid and semantically mute, and it costs calls to
+ * recover from (free-admin#674). Naming the scope is the missing half.
+ * Goes to stderr so `--json` and `--csv` stay pipeable.
+ */
+export function printEmptyScope(workspaceId?: string): void {
+  console.error(
+    chalk.dim(
+      workspaceId
+        ? `(0 results in workspace ${workspaceId})`
+        : "(0 results in the session's active workspace - check it with `ft whoami`, or scope with --workspace <id>)",
+    ),
+  );
 }
