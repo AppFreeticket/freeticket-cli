@@ -2,11 +2,13 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 import {
+  deleteTokensId,
   getAuditLog,
   getFeatureFlags,
   getMe,
   getPlatformPlans,
   getPlatformPlansId,
+  getTokens,
   getUsers,
   getUsersId,
   getWorkspaces,
@@ -17,14 +19,16 @@ import {
   postImpersonate,
   postImpersonateStop,
   postPlatformPlans,
+  postTokens,
   postWorkspaces,
+  postWorkspacesIdPlan,
   postWorkspacesIdRestore,
   postWorkspacesIdSuspend,
   putFeatureFlagsKey,
 } from "../admin-client/sdk.gen";
 import { configureAdminClient, unwrap } from "../lib/api";
 import { CONFIG_PATH, loadConfig, saveConfig } from "../lib/config";
-import { confirm, parseData } from "../lib/input";
+import { confirmOrExit, parseData } from "../lib/input";
 import { print, printNextCursor, toCsv } from "../lib/output";
 
 type SdkFn = (
@@ -174,6 +178,17 @@ export function registerAdmin(program: Command): void {
           describe: "Restore a suspended workspace",
           fn: postWorkspacesIdRestore,
         },
+        {
+          // Assisted sale: activates a tier without going through Stripe
+          // self-service. If the tenant had a Stripe subscription it is
+          // cancelled there first; a failure there aborts with 409.
+          name: "plan",
+          describe:
+            'Assign a platform plan manually (--data \'{"planSlug":"spark|star|icon|legend"}\')',
+          fn: postWorkspacesIdPlan,
+          body: true,
+          confirm: true,
+        },
       ],
       columns: ["id", "name", "type", "country", "suspended", "createdAt"],
       listFlags: [
@@ -221,6 +236,25 @@ export function registerAdmin(program: Command): void {
         },
       ],
       columns: ["key", "enabled", "description"],
+      noPaging: true,
+    },
+    {
+      // Platform service tokens (PAT): headless credential for `ft admin` in
+      // CI, minted from an interactive SUPER_ADMIN session. The plaintext is
+      // only ever returned by `create` — store it right away.
+      name: "tokens",
+      describe: "Platform service tokens (PAT)",
+      list: getTokens,
+      create: postTokens,
+      actions: [
+        {
+          name: "revoke",
+          describe: "Revoke a service token",
+          fn: deleteTokensId,
+          confirm: true,
+        },
+      ],
+      columns: ["id", "name", "lastUsedAt", "expiresAt", "createdAt"],
       noPaging: true,
     },
     {
@@ -330,13 +364,8 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
       cmd.option("--data <json>", "JSON body (inline or @file.json)");
     }
     cmd.action(async (value, opts) => {
-      if (
-        action.confirm &&
-        !opts.yes &&
-        !(await confirm(`${action.name} ${singular} ${value}?`))
-      ) {
-        console.error("Aborted.");
-        return;
+      if (action.confirm) {
+        await confirmOrExit(`${action.name} ${singular} ${value}?`, opts.yes);
       }
       configureAdminClient();
       const payload: Record<string, unknown> = { path: { [param]: value } };

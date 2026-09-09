@@ -29,6 +29,26 @@ export function parseData(input?: string): unknown {
 }
 
 /**
+ * Confirmation gate for destructive commands. Aborting exits non-zero so a
+ * script chaining `ft … delete && next-step` never mistakes a refusal for a
+ * success (issue #24). Without a TTY it fails immediately pointing at --yes,
+ * instead of hanging or silently doing nothing.
+ */
+export async function confirmOrExit(
+  question: string,
+  yes: boolean | undefined,
+): Promise<void> {
+  if (yes) return;
+  if (!process.stdin.isTTY) {
+    fail(
+      `Refusing: ${question} — no TTY to confirm.`,
+      "Pass --yes in scripts / CI.",
+    );
+  }
+  if (!(await confirm(question))) fail("Aborted.");
+}
+
+/**
  * Y/N confirmation prompt on stderr (keeps stdout clean for `--json`/pipes).
  * Returns true only on an explicit yes. Non-interactive stdin → false.
  */

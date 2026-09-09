@@ -47,6 +47,31 @@ export function configureAdminClient(): void {
   });
 }
 
+/**
+ * Signed downloads (settlement PDF / payment proofs): the API answers **302**
+ * to a 5-minute URL on private storage. `fetch` would follow the redirect and
+ * pull the whole file into memory, so we stop at the 302 and hand over the
+ * link. Uses the same config the generated client already holds.
+ */
+export async function signedDownload(
+  path: string,
+): Promise<{ url: string; expiresInMinutes: number }> {
+  const cfg = client.getConfig();
+  const res = await fetch(`${cfg.baseUrl}${path}`, {
+    redirect: "manual",
+    headers: cfg.headers as Record<string, string>,
+  });
+  const url = res.headers.get("location");
+  if (!url)
+    fail(
+      `The API did not return a signed URL (HTTP ${res.status}).`,
+      res.status === 404
+        ? "The settlement has no document yet, or it belongs to another workspace."
+        : undefined,
+    );
+  return { url, expiresInMinutes: 5 };
+}
+
 type ApiError = {
   code?: string;
   message?: string;
