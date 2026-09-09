@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import Table from "cli-table3";
+import { loadConfig } from "./config";
 
 interface PrintOpts {
   json?: boolean;
@@ -122,7 +123,12 @@ function pick(
  * recover from (free-admin#674). Naming the scope is the missing half.
  * Goes to stderr so `--json` and `--csv` stay pipeable.
  */
-export function printEmptyScope(workspaceId?: string): void {
+export function printEmptyScope(workspaceFlag?: string): void {
+  // Resolved here rather than by each caller: three command families need this
+  // and the copy in resource.ts is exactly the duplication that let api-keys
+  // and admin miss the fix (issue #39). The flag wins, then the stored session;
+  // undefined means the API picked the default and naming it would cost a /me.
+  const workspaceId = workspaceFlag ?? loadConfig().workspaceId;
   console.error(
     chalk.dim(
       workspaceId

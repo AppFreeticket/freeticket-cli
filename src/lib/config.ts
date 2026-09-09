@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -42,9 +48,15 @@ export function saveConfig(patch: Partial<FtConfig>): void {
   const next = { ...readFile(), ...patch };
   mkdirSync(dirname(CONFIG_PATH), { recursive: true });
   // 0600: the file stores credentials (device-flow session or CI API key).
+  // `mode` on writeFileSync only applies when the file is CREATED - it is the
+  // mode passed to open(2) with O_CREAT. An existing file keeps whatever mode
+  // it already had (a restored backup, a different umask, a CLI version that
+  // did not set it), so the credentials could stay world-readable forever with
+  // no warning. chmod every write to make the promise in this comment true.
   writeFileSync(CONFIG_PATH, `${JSON.stringify(next, null, 2)}\n`, {
     mode: 0o600,
   });
+  chmodSync(CONFIG_PATH, 0o600);
 }
 
 export { CONFIG_PATH };

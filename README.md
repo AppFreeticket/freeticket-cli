@@ -29,8 +29,9 @@ Events, sales, tickets, memberships, venues, staff, and reports — one command 
 opening the dashboard: list events, review sales, export buyers, check KPIs,
 and use readable output or `--json` for pipelines and scripts.
 
-The client is **generated from the backend OpenAPI 3.1 contract**, so every
-endpoint exposed by the API exists as a command and never drifts out of sync.
+The client is **generated from the backend OpenAPI 3.1 contract**, so the
+commands never drift from the API they call: types, parameters and enums all
+come from the spec, and a contract change is picked up by regenerating.
 
 ## Installation
 
@@ -87,7 +88,7 @@ ft sales list --status CONFIRMED --json
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
 | `ft sales list` · `get <id>` | Sales (filters: `--status` `--channel` `--event` `--event-date` `--reference` `--buyer` `--from` `--to`) | STAFF |
 | `ft sales create` | Create a sale/order — comps & programmatic sales (`--data <json>`) | ADMIN |
-| `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for the partial amount and for the `acknowledge_open_payment` / `acknowledge_manual` flags) | ADMIN |
+| `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for the `acknowledge_open_payment` / `acknowledge_manual` flags) | ADMIN |
 | `ft sales tickets <id>` | List the individual tickets/attendees of a sale | STAFF |
 | `ft tickets access <code>` | Read a ticket's access status (no admit) | STAFF |
 | `ft tickets checkin <code>` | Admit a ticket at the door (idempotent) | STAFF |

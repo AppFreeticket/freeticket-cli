@@ -9,6 +9,10 @@ import {
   deleteTicketTypesId,
   deleteVenuesId,
   deleteWebhooksId,
+  getContentLives,
+  getContentLivesId,
+  getContentPosts,
+  getContentVideos,
   getDiscounts,
   getEvents,
   getEventsId,
@@ -33,6 +37,7 @@ import {
   patchStaffIdRole,
   patchTicketTypesId,
   patchVenuesId,
+  postContentPlaybackToken,
   postDiscounts,
   postEvents,
   postEventsIdDates,
@@ -55,8 +60,9 @@ import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
 import { registerWorkspace } from "./commands/workspace";
-import { configureClient, signedDownload } from "./lib/api";
+import { configureClient, signedDownload, unwrap } from "./lib/api";
 import { banner } from "./lib/banner";
+import { parseData } from "./lib/input";
 import { print } from "./lib/output";
 import { notifyUpdate } from "./lib/update-check";
 
@@ -155,7 +161,11 @@ registerResource(program, {
     },
     {
       name: "refund",
-      describe: "Refund a sale (--data for partial amount)",
+      // The contract's SaleRefundRequest only takes `acknowledge_manual` and is
+      // additionalProperties:false, so there is no partial-amount field to pass.
+      // The old text promised one and earned a guaranteed 422 (issue #42).
+      describe:
+        "Refund a sale (--data '{\"acknowledge_manual\":true}' for a manual/offline refund)",
       fn: postSalesIdRefund,
       body: true,
     },
@@ -306,6 +316,51 @@ registerResource(program, {
       query: "workspaceIds",
     },
   ],
+});
+
+// Content lives on the B2B contract since 1.7.0 (free-admin#356) and the mcp
+// already exposed it; only the CLI was missing it (issue #40). Read-only:
+// videos/posts/lives are listings, and playback-token is an action that mints a
+// short-lived signed URL, so it goes under `lives` rather than as a CRUD verb.
+registerResource(program, {
+  name: "content-videos",
+  describe: "Organization videos",
+  list: getContentVideos,
+  columns: ["id", "title", "publishedAt", "memberOnly"],
+});
+
+registerResource(program, {
+  name: "content-posts",
+  describe: "Organization posts",
+  list: getContentPosts,
+  columns: ["id", "title", "publishedAt", "memberOnly"],
+});
+
+registerResource(program, {
+  name: "content-lives",
+  describe: "Organization live streams",
+  list: getContentLives,
+  get: getContentLivesId,
+  columns: ["id", "title", "status", "startsAt", "memberOnly"],
+  extend: (root) => {
+    root
+      .command("playback-token")
+      .description(
+        "Mint a signed playback token (30 min live / 1 h video). `memberOnly` content needs a buyer session.",
+      )
+      .requiredOption("--data <json>", "JSON body (inline or @file.json)")
+      .option("--workspace <id>", "workspace override")
+      .option("--json", "raw JSON output")
+      .action(async (opts) => {
+        configureClient(opts.workspace);
+        const body = unwrap(
+          await postContentPlaybackToken({
+            body: parseData(opts.data) as never,
+          }),
+        );
+        print(body?.data ?? body, { json: opts.json });
+      });
+  },
 });
 
 registerTickets(program);

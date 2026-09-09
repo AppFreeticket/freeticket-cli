@@ -28,7 +28,7 @@ export function registerReports(program: Command): void {
       const body = unwrap(
         await getReportsSummary({ query: { period: opts.period } }),
       );
-      print(body.data, { json: opts.json });
+      printExport(body.data, opts);
     });
 
   root
@@ -45,6 +45,7 @@ export function registerReports(program: Command): void {
     .option("--page-size <n>", "rows per page")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
@@ -59,7 +60,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      print(body.data, { json: opts.json });
+      printExport(body.data, opts);
     });
 
   root
@@ -98,6 +99,7 @@ export function registerReports(program: Command): void {
     .option("--status <s>", "filter by sale status")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
@@ -105,7 +107,7 @@ export function registerReports(program: Command): void {
           query: { from: opts.from, to: opts.to, status: opts.status },
         }),
       );
-      print(body.data, { json: opts.json });
+      printExport(body.data, opts);
     });
 
   root
@@ -117,6 +119,7 @@ export function registerReports(program: Command): void {
     .option("--event <id>", "filter by event")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
@@ -129,27 +132,34 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      print(body.data, { json: opts.json });
+      printExport(body.data, opts);
     });
 
   root
     .command("inventory")
     .description("Capacity / sold / reserved / available per event·date·type")
-    .option("--event-id <id>", "filter by event")
-    .option("--event-date-id <id>", "filter by event date")
+    // The contract spells these `eventId`/`eventDateId` here but `event`/
+    // `eventDate` on /sales and /discounts, so the flag that works everywhere
+    // else fails exactly here (issue #41). Both spellings are accepted until
+    // the contract normalizes (free-admin#357); `--event` is the canonical one.
+    .option("--event <id>", "filter by event")
+    .option("--event-date <id>", "filter by event date")
+    .option("--event-id <id>", "alias of --event")
+    .option("--event-date-id <id>", "alias of --event-date")
     .option("--from <date>", "date from (ISO 8601)")
     .option("--to <date>", "date to (ISO 8601)")
     .option("--include-drafts", "include draft events")
     .option("--group-by <g>", "ticketType | date | event")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
+    .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
         await getReportsInventory({
           query: {
-            eventId: opts.eventId,
-            eventDateId: opts.eventDateId,
+            eventId: opts.event ?? opts.eventId,
+            eventDateId: opts.eventDate ?? opts.eventDateId,
             from: opts.from,
             to: opts.to,
             includeDrafts: opts.includeDrafts,
@@ -157,7 +167,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      print(body.data, { json: opts.json });
+      printExport(body.data, opts);
     });
 
   const exp = root

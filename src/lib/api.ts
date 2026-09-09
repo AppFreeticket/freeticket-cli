@@ -103,6 +103,13 @@ export function unwrap<T>(res: {
   );
 }
 
+/**
+ * One line telling the caller what to do next. The split that matters is
+ * retryable vs not: an agent burning a tool budget needs to tell "wait and try
+ * again" apart from "this will never work", and today it can only infer that
+ * from the status. A `retryable` flag in the error envelope would be better
+ * (AppFreeticket/free-admin#677); until then this is the honest approximation.
+ */
 function hintFor(status?: number): string | undefined {
   switch (status) {
     case 401:
@@ -111,8 +118,16 @@ function hintFor(status?: number): string | undefined {
       return "Your role or workspace does not allow this action.";
     case 404:
       return "The resource does not exist or belongs to another workspace.";
+    case 422:
+      return "Validation failed. Fix the fields listed above and retry.";
+    case 429:
+      return "Rate limit reached. Wait and retry with backoff - this one is worth retrying.";
+    case 500:
+      return "Server error. Retry once; if it persists, report it.";
     case 501:
       return "The backend has not implemented this operation yet.";
+    case 503:
+      return "The service is temporarily unavailable. Retry with backoff.";
   }
 }
 

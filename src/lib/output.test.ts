@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { print, printEmptyScope, toCsv } from "./output";
 
+// printEmptyScope falls back to the stored session workspace, so without this
+// the test would read the developer's real ~/.freeticket/config.json.
+vi.mock("./config", () => ({ loadConfig: () => ({}) }));
+
 describe("toCsv", () => {
   const cols = ["id", "reference", "status", "total", "currency", "createdAt"];
 
