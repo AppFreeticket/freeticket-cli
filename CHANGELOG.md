@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.9.0
+
+### Minor Changes
+
+- 921e5f9: Contract 1.7.0 + admin 1.3.0 — the six gaps free-admin closed at once.
+
+  - `ft settlements document <id>` — the comprobante PDF is no longer panel-only.
+    The API answers 302 to a private-storage URL, so the command prints the
+    **signed link (5 min TTL)** instead of following the redirect and dumping a
+    binary into the terminal. `--proof <fileName>` downloads a payment proof
+    instead (file names come from `ft settlements list`).
+  - `ft events list --status <s> --with-total` — the status filter runs in the
+    query (so `--limit` counts rows actually returned, not rows scanned) and
+    `--with-total` opts into `page.total`.
+  - `ft staff list --workspace-ids <ids>` — staff of up to 25 workspaces in **one**
+    call, each row tagged with its workspace, instead of one request per
+    workspace. The API intersects the ids against what the credential already
+    administers: it never widens scope.
+  - `ft sales cancel <id> --data '{"acknowledge_open_payment":true}'` — the
+    contract now requires the flag when the payment is still open at the gateway.
+    `ft sales refund` gained `acknowledge_manual` the same way.
+  - `ft admin workspaces plan <id> --data '{"planSlug":"legend"}'` — assisted
+    sale: activates a tier without Stripe self-service. `ft admin workspaces
+update` accepts `webTemplate`, `customDomain` and `customDomainVerifiedAt`.
+  - `ft workspace list` shows `role` and `access` per workspace: the **effective**
+    role there (not the account-wide one) and the enabled sections (`full`,
+    `revoked`, or the section list).
+  - `GET /me` now returns the **effective role and sections per workspace**; the
+    global `role` is deprecated in the contract. Enforcement is the backend's:
+    a credential capped in the panel is capped through the CLI too.
+
+- 5291114: Contract 1.5.0 + admin 1.1.0, and two output/exit-code fixes.
+
+  - `ft settlements list` — settlements paid to the organizer (`--event`, `--status`).
+    The comprobante PDF is still panel-only; the contract exposes `hasDocument`
+    and the file names, not a download URL.
+  - `ft reports financials` — per-function P&L (gross, platform fee, facial,
+    payment fee, 4x1000, net to settle) plus the linked settlement status. Same
+    numbers as the Liquidaciones dashboard, so a finance integration no longer
+    has to recompute them from `/sales` + Mercado Pago.
+  - `ft admin tokens list|create|revoke` — platform service tokens (PAT), the
+    headless credential for `ft admin` in CI.
+  - `ft events list --q <text>` — server-side search.
+  - Fix: `reports export reconciliation` answers `text/csv`, so its payload is a
+    string. It used to go through `JSON.stringify`, which quoted the whole file
+    and escaped the newlines as a literal `\n`, breaking Excel/pandas/Sheets.
+    CSV payloads are now written verbatim.
+  - Fix: a refused or non-confirmable destructive command (`delete`, `revoke`,
+    `admin ... suspend`) exits 1 instead of 0, so `ft … delete && next-step` no
+    longer runs `next-step`. Without a TTY it fails immediately pointing at
+    `--yes` instead of silently doing nothing.
+  - `--csv` on every `reports export`, `--json` on `ft login` / `ft config`.
+
 ## 0.8.0
 
 ### Minor Changes
