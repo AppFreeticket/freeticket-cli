@@ -4,7 +4,13 @@ import { deleteApiKeysId, getApiKeys, postApiKeys } from "../client/sdk.gen";
 import type { ApiKeyScope } from "../client/types.gen";
 import { configureClient, fail, unwrap } from "../lib/api";
 import { confirmOrExit } from "../lib/input";
-import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
+import {
+  print,
+  printEmptyScope,
+  printNextCursor,
+  resolveColumns,
+  toCsv,
+} from "../lib/output";
 
 /** Columns shown in `api-keys list` — never the secret (the API never returns it). */
 const COLUMNS = [
@@ -112,7 +118,12 @@ export function registerApiKeys(program: Command): void {
           process.stdout.write(`${toCsv(rows, columns)}\n`);
           return;
         }
-        print(rows, { json: opts.json, columns });
+        print(rows, {
+          json: opts.json,
+          columns,
+          columnsExplicit: Boolean(opts.columns),
+        });
+        if (rows.length === 0) printEmptyScope(opts.workspace);
         return;
       }
 
@@ -121,7 +132,12 @@ export function registerApiKeys(program: Command): void {
         process.stdout.write(`${toCsv(body.data, columns)}\n`);
         return;
       }
-      print(body.data, { json: opts.json, columns });
+      print(body.data, {
+        json: opts.json,
+        columns,
+        columnsExplicit: Boolean(opts.columns),
+      });
+      if ((body.data ?? []).length === 0) printEmptyScope(opts.workspace);
       if (!opts.json) printNextCursor(body.page);
     });
 

@@ -1,7 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: generated SDK boundary — signatures vary by resource.
 import type { Command } from "commander";
 import { configureClient, unwrap } from "../lib/api";
-import { loadConfig } from "../lib/config";
 import { confirmOrExit, parseData } from "../lib/input";
 import {
   print,
@@ -54,13 +53,6 @@ interface ResourceSpec {
  * list also gets --limit/--cursor/--csv; mutations take --data (inline JSON
  * or @file); delete asks for confirmation unless --yes.
  */
-/** The workspace this call ran against, when we know it: the flag wins, then
- * the stored session. Undefined means the API picked the session default and
- * the CLI cannot name it without spending a /me call on an empty list. */
-function activeWorkspace(flag?: string): string | undefined {
-  return flag ?? loadConfig().workspaceId;
-}
-
 export function registerResource(program: Command, spec: ResourceSpec): void {
   const root = program.command(spec.name).description(spec.describe);
   const singular = spec.name.replace(/s$/, "");
@@ -118,7 +110,7 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
           columns,
           columnsExplicit: Boolean(opts.columns),
         });
-        if (rows.length === 0) printEmptyScope(activeWorkspace(opts.workspace));
+        if (rows.length === 0) printEmptyScope(opts.workspace);
         return;
       }
 
@@ -136,8 +128,7 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
         columns,
         columnsExplicit: Boolean(opts.columns),
       });
-      if ((body.data ?? []).length === 0)
-        printEmptyScope(activeWorkspace(opts.workspace));
+      if ((body.data ?? []).length === 0) printEmptyScope(opts.workspace);
       if (!opts.json) printNextCursor(body.page);
     });
   }

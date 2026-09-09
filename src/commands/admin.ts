@@ -29,7 +29,7 @@ import {
 import { configureAdminClient, unwrap } from "../lib/api";
 import { CONFIG_PATH, loadConfig, saveConfig } from "../lib/config";
 import { confirmOrExit, parseData } from "../lib/input";
-import { print, printNextCursor, toCsv } from "../lib/output";
+import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
 
 type SdkFn = (
   opts: any,
@@ -139,12 +139,18 @@ export function registerAdmin(program: Command): void {
     .command("impersonate")
     .description('Start impersonation (--data \'{"targetUserId":"..."}\')')
     .requiredOption("--data <json>", "JSON body (inline or @file.json)")
+    .option("--yes", "skip confirmation")
     .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureAdminClient();
-      const body = unwrap(
-        await postImpersonate({ body: parseData(opts.data) as never }),
+      const payload = parseData(opts.data) as { targetUserId?: string };
+      // The most sensible action in the CLI: it acts in someone else's name.
+      // `workspaces suspend` (reversible) already confirms; this did not.
+      await confirmOrExit(
+        `Impersonate user ${payload.targetUserId ?? "(no targetUserId in --data)"}?`,
+        opts.yes,
       );
+      const body = unwrap(await postImpersonate({ body: payload as never }));
       print(body?.data ?? body, { json: opts.json });
     });
 
@@ -287,8 +293,16 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
         .option("--cursor <id>", "pagination cursor");
     }
     for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
+    // Parity with `registerResource` (issue #39): these existed for the B2B
+    // commands and not here, so the same flag worked or not depending on which
+    // family you were in. No --workspace hint on empty results: the superadmin
+    // surface is cross-tenant, there is no active workspace to name.
+    cmd.option("--columns <list>", "comma-separated columns to display");
+    cmd.option("--full", "show every field instead of the curated columns");
+    cmd.option("--all", "auto-paginate: fetch every page (ignores --cursor)");
     cmd.option("--csv", "CSV output");
     cmd.option("--json", "raw JSON output");
+    cmd.option("--raw", "raw JSON output including pagination metadata (page)");
     cmd.action(async (opts) => {
       configureAdminClient();
       const query: Record<string, unknown> = {};
@@ -300,12 +314,44 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
         const v = opts[camel(f.query)];
         if (v !== undefined) query[f.query] = v;
       }
-      const body = unwrap(await list({ query }));
-      if (opts.csv) {
-        process.stdout.write(`${toCsv(body.data, spec.columns)}\n`);
+      const columns = resolveColumns(opts, spec.columns);
+
+      if (opts.all && !spec.noPaging) {
+        const rows: unknown[] = [];
+        let cursor: string | undefined;
+        let page: { nextCursor?: string | null; hasMore?: boolean } | undefined;
+        do {
+          const body = unwrap(await list({ query: { ...query, cursor } }));
+          rows.push(...(body.data ?? []));
+          page = body.page;
+          cursor = page?.nextCursor ?? undefined;
+        } while (page?.hasMore && cursor);
+        if (opts.csv) {
+          process.stdout.write(`${toCsv(rows, columns)}\n`);
+          return;
+        }
+        print(rows, {
+          json: opts.json,
+          columns,
+          columnsExplicit: Boolean(opts.columns),
+        });
         return;
       }
-      print(body.data, { json: opts.json, columns: spec.columns });
+
+      const body = unwrap(await list({ query }));
+      if (opts.raw) {
+        print(body, { json: true });
+        return;
+      }
+      if (opts.csv) {
+        process.stdout.write(`${toCsv(body.data, columns)}\n`);
+        return;
+      }
+      print(body.data, {
+        json: opts.json,
+        columns,
+        columnsExplicit: Boolean(opts.columns),
+      });
       if (!opts.json && !spec.noPaging) printNextCursor(body.page);
     });
   }
