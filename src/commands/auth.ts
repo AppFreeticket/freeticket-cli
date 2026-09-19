@@ -25,7 +25,10 @@ export function registerAuth(program: Command): void {
       "--url <url>",
       "API base URL (default: https://admin.appfreeticket.com)",
     )
-    .option("--workspace <id>", "default active workspace")
+    .option(
+      "--workspace <id>",
+      "pin this login to one workspace (default: every workspace the account reaches)",
+    )
     .option("--json", "raw JSON output (confirmation goes to stderr)")
     .action(async (opts) => {
       if (opts.url) saveConfig({ apiUrl: opts.url });
@@ -36,10 +39,11 @@ export function registerAuth(program: Command): void {
         : await deviceLogin();
       const workspaceId = opts.workspace ?? cred.workspaceId;
 
-      saveConfig({
-        apiKey: cred.apiKey,
-        ...(workspaceId ? { workspaceId } : {}),
-      });
+      // Passing `undefined` is the point: a fresh login must drop the
+      // workspace a previous one pinned, and an undefined value disappears in
+      // JSON.stringify, so the key leaves the file instead of being merged
+      // back in from what was already there.
+      saveConfig({ apiKey: cred.apiKey, workspaceId });
       // Verify the credential against /me before reporting success.
       configureClient(workspaceId);
       const me = unwrap(await getMe({})).data;
@@ -107,9 +111,16 @@ function openBrowser(url: string): void {
 
 /**
  * OAuth 2.0 Device Authorization Grant (RFC 8628): self-service browser login.
- * Mints an access token bound to the user's role + chosen workspace, so anyone
- * can authenticate without a backend-issued API key. Returns the credential to
- * persist. The endpoints are public (no auth) — the token IS the bootstrap.
+ * Mints an access token bound to the user's role, so anyone can authenticate
+ * without a backend-issued API key. Returns the credential to persist. The
+ * endpoints are public (no auth) — the token IS the bootstrap.
+ *
+ * It pins **no workspace**. Logging in used to silently make `workspaces[0]`
+ * the active one, so a user who belonged to five tenants saw one and never
+ * learnt the other four existed. With nothing pinned, the lists widen to every
+ * workspace the credential reaches and the rest of the commands fall back to
+ * the account's default one, which is what /api/v1 does when X-Workspace-Id is
+ * absent. `ft workspace use <slug>` still pins on purpose.
  */
 async function deviceLogin(): Promise<{
   apiKey: string;
@@ -140,14 +151,13 @@ async function deviceLogin(): Promise<{
     });
     if (res.data) {
       const { access_token, workspaces } = res.data;
-      const active = workspaces[0];
-      if (workspaces.length > 1 && active) {
+      if (workspaces.length > 1) {
         console.log(
           `\n${chalk.dim("Workspaces:")} ${workspaces.map((w) => w.slug).join(", ")}` +
-            ` ${chalk.dim(`(using ${active.slug}; switch with --workspace)`)}`,
+            ` ${chalk.dim("(all of them; narrow with --workspace or `ft workspace use`)")}`,
         );
       }
-      return { apiKey: access_token, workspaceId: active?.id };
+      return { apiKey: access_token };
     }
     switch (res.error?.error) {
       case "authorization_pending":

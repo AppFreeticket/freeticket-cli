@@ -1,5 +1,6 @@
 import { client as adminClient } from "../admin-client/client.gen";
 import { client } from "../client/client.gen";
+import { getMe } from "../client/sdk.gen";
 import { loadConfig } from "./config";
 
 /**
@@ -104,6 +105,21 @@ export function unwrap<T>(res: {
 }
 
 /**
+ * The same message `unwrap` would abort with, as a string. A fan-out across
+ * workspaces needs to name what went wrong in one of them without killing the
+ * command: the other workspaces still have rows to show.
+ */
+export function describeError(res: {
+  error?: unknown;
+  response?: Response;
+}): string {
+  const status = res.response?.status;
+  const err = (res.error as { error?: ApiError })?.error;
+  if (!err) return `HTTP ${status ?? "error"}`;
+  return `${status ?? ""} ${err.code ?? "?"}: ${err.message ?? "unknown failure"}`.trim();
+}
+
+/**
  * One line telling the caller what to do next. The split that matters is
  * retryable vs not: an agent burning a tool budget needs to tell "wait and try
  * again" apart from "this will never work", and today it can only infer that
@@ -136,4 +152,46 @@ export function fail(message: string, hint?: string): never {
   console.error(message);
   if (hint) console.error(`\n${hint}`);
   process.exit(1);
+}
+
+/** One workspace of a fan-out, as `GET /me` describes it. */
+export interface WorkspaceTarget {
+  id: string;
+  name: string;
+}
+
+/**
+ * The workspaces a list command should read.
+ *
+ * `null` means "just call the API once as configured" — the caller pinned one
+ * with `--workspace`, or the session is pinned (`ft workspace use`,
+ * `FT_WORKSPACE_ID`), or the account only reaches one anyway. Anything else is
+ * the set to fan out across: belonging to five workspaces and being shown one
+ * of them, silently, is how people never learn the other four exist.
+ *
+ * A /me that cannot be read returns `null` too: falling back to the single
+ * call is honest, printing an empty list because discovery failed is not.
+ */
+export async function listTargets(
+  override?: string,
+): Promise<WorkspaceTarget[] | null> {
+  if (override || loadConfig().workspaceId) return null;
+  const res = await getMe({});
+  const workspaces = res.data?.data.workspaces ?? [];
+  // `sections: []` = access revoked or expired in that workspace; `null` =
+  // unrestricted. Querying a revoked one only buys a 403.
+  const reachable = workspaces.filter(
+    (w) => w.sections === null || w.sections.length > 0,
+  );
+  return reachable.length > 1 ? reachable : null;
+}
+
+/**
+ * Spreads `limit` across the workspaces about to be queried, so `--limit 20`
+ * over five workspaces is 20 rows and not 100. Rounds up, and the surplus is
+ * trimmed off the aggregate by the caller.
+ */
+export function splitLimit(limit: number, targets: number): number {
+  if (!Number.isFinite(limit) || limit <= 0 || targets <= 1) return limit;
+  return Math.max(1, Math.ceil(limit / targets));
 }

@@ -62,7 +62,9 @@ ft login
 # 2. Who am I, and which workspaces can I access?
 ft whoami
 
-# 3. Pick the workspace you want to operate on (persisted locally).
+# 3. Optional: pin one workspace (persisted locally). Without this, the lists
+#    and the row-shaped reports read EVERY workspace you can access and tag
+#    each row with the one it came from. `ft workspace clear` unpins.
 ft workspace list
 ft workspace use my-workspace-slug
 
@@ -79,7 +81,7 @@ ft sales list --status CONFIRMED --json
 | `ft login` | Browser login (device flow); `--key <key>` for CI | VIEWER |
 | `ft whoami` | Active user and accessible workspaces | VIEWER |
 | `ft config` · `ft logout` | Show config (masked key) · remove key | — |
-| `ft workspace list` · `use <id\|slug>` · `show` | List, switch, and show the active workspace | VIEWER |
+| `ft workspace list` · `use <id\|slug>` · `clear` · `show` | List workspaces, pin one, unpin, show the current one | VIEWER |
 | `ft events list` · `get <id>` | Workspace events (`--q` `--status` `--with-total`) | VIEWER |
 | `ft events create` · `update <id>` · `delete <id>` | Manage events (`--data <json>`) | ADMIN |
 | `ft events publish <id>` | Publish an event | ADMIN |
@@ -119,8 +121,8 @@ ft sales list --status CONFIRMED --json
 | Flag | Applies to | Description |
 |---|---|---|
 | `--json` | all commands | Raw JSON, ideal for `jq`/scripts. On **lists this is the data array only** — use `--raw` for the paginated envelope |
-| `--workspace <id>` | all commands | Run the command against another workspace |
-| `--limit <n>` `--cursor <id>` | list commands | Cursor pagination (1-100, default 20) |
+| `--workspace <id>` | all commands | Read only this workspace. Lists and row-shaped reports otherwise cover **every workspace you can access**, tagging rows with `workspaceId`/`workspaceName` |
+| `--limit <n>` `--cursor <id>` | list commands | Cursor pagination (1-100, default 20). Across workspaces the limit is split between them; `--cursor` needs a single workspace, since a cursor from one means nothing in another |
 | `--all` | list commands | Auto-paginate: fetch every page (ignores `--cursor`) |
 | `--raw` | list commands | JSON `{ data, page }` envelope, including `page.nextCursor` for scripted pagination |
 | `--columns <a,b,c>` `--full` | list commands | Pick specific columns · show every field |

@@ -6,19 +6,25 @@ import { loadConfig, saveConfig } from "../lib/config";
 import { print } from "../lib/output";
 
 /**
- * `ft workspace list|use|show`: pick and persist the active workspace.
- * Everything comes from GET /me (workspaces[] + activeWorkspaceId); the choice
- * is stored locally and sent as the `X-Workspace-Id` header on every request.
+ * `ft workspace list|use|clear|show`: pin, unpin and inspect the workspace.
+ * Everything comes from GET /me (workspaces[] + activeWorkspaceId).
+ *
+ * Pinning is **opt-in**: by default nothing is stored, the lists read every
+ * workspace the account reaches and the rest of the commands fall back to the
+ * account's default one. `use` stores the choice and sends it as the
+ * `X-Workspace-Id` header on every request — which is also what makes deep
+ * pagination possible, since a cursor only means something inside one
+ * workspace. `clear` puts it back to reading all of them.
  */
 export function registerWorkspace(program: Command): void {
   const root = program
     .command("workspace")
-    .description("List, switch, and show the active workspace");
+    .description("List, pin, unpin, and show workspaces");
 
   root
     .command("list")
     .alias("ls")
-    .description("List the workspaces you can access (marks the active one)")
+    .description("List the workspaces you can access (marks the pinned one)")
     .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureClient();
@@ -49,7 +55,7 @@ export function registerWorkspace(program: Command): void {
   root
     .command("use <idOrSlug>")
     .description(
-      "Set the active workspace (persisted in ~/.freeticket/config.json)",
+      "Pin every command to one workspace (persisted in ~/.freeticket/config.json)",
     )
     .action(async (idOrSlug) => {
       configureClient();
@@ -70,6 +76,18 @@ export function registerWorkspace(program: Command): void {
     });
 
   root
+    .command("clear")
+    .description("Unpin: go back to reading every workspace you can access")
+    .action(() => {
+      // `undefined` disappears in JSON.stringify, so the key leaves the file
+      // instead of being merged back in from what was already stored.
+      saveConfig({ workspaceId: undefined });
+      console.log(
+        `${chalk.green("✓")} No workspace pinned: lists now read all of them.`,
+      );
+    });
+
+  root
     .command("show")
     .description("Show the active workspace")
     .option("--json", "raw JSON output")
@@ -81,8 +99,8 @@ export function registerWorkspace(program: Command): void {
       const active = me.workspaces.find((w) => w.id === activeId);
       if (!active) {
         fail(
-          "No active workspace set.",
-          "Pick one with `ft workspace use <slug>`.",
+          "No workspace pinned and the account has no default one.",
+          "Pick one with `ft workspace use <slug>`, or list them with `ft workspace list`.",
         );
       }
       print(active, { json: opts.json });

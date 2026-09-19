@@ -97,9 +97,9 @@ describe("printEmptyScope", () => {
     expect(captureErr(() => printEmptyScope("ws_123"))).toContain("ws_123");
   });
 
-  it("points at whoami when the scope is the session default", () => {
+  it("points at the workspace list when the scope is the account default", () => {
     const msg = captureErr(() => printEmptyScope());
-    expect(msg).toContain("ft whoami");
+    expect(msg).toContain("ft workspace list");
     expect(msg).toContain("--workspace");
   });
 });
