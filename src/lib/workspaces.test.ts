@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { client } from "../client/client.gen";
 import { getMe } from "../client/sdk.gen";
 import {
   expandTargets,
@@ -10,19 +11,36 @@ import {
 import type { ResolvedAccount } from "./config";
 
 vi.mock("../client/sdk.gen", () => ({ getMe: vi.fn() }));
-// The real one reads ~/.freeticket/config.json, so on a developer machine with
-// a workspace already pinned every fan-out test would pass for the wrong reason.
+// The real file is ~/.freeticket/config.json: on a developer machine with a
+// workspace already pinned every fan-out test would pass for the wrong reason.
+// So the stored accounts come from `stored` and the env from `env`, but they
+// go through the real resolution (resolveAccounts), not a copy of it.
 let stored: ResolvedAccount[] = [];
-vi.mock("./config", () => ({
-  loadConfig: () => ({ apiUrl: "http://localhost" }),
-  effectiveAccounts: (flag?: string) => {
-    const all = stored.map((a) => ({
-      ...a,
-      workspaceId: process.env.FT_WORKSPACE_ID ?? a.workspaceId,
-    }));
-    return flag ? all.filter((a) => a.name === flag) : all;
-  },
-}));
+let env: NodeJS.ProcessEnv = {};
+vi.mock("./config", async (orig) => {
+  const real = await orig<typeof import("./config")>();
+  return {
+    ...real,
+    loadConfig: () => ({ apiUrl: "http://localhost" }),
+    effectiveAccounts: (flag?: string) =>
+      real.resolveAccounts(
+        {
+          accounts: Object.fromEntries(
+            stored.map((a) => [
+              a.name,
+              {
+                apiKey: a.apiKey,
+                apiUrl: a.apiUrl,
+                workspaceId: a.workspaceId,
+              },
+            ]),
+          ),
+        },
+        env,
+        flag,
+      ),
+  };
+});
 
 const acct = (name: string, workspaceId?: string): ResolvedAccount => ({
   name,
@@ -41,17 +59,31 @@ const me = (
   },
 });
 
-const saved = { ...process.env };
 beforeEach(() => {
-  process.env.FT_WORKSPACE_ID = undefined;
-  delete process.env.FT_WORKSPACE_ID;
+  env = {};
   vi.mocked(getMe).mockReset();
   stored = [acct("solo")];
   setAccountFlag(undefined);
 });
 afterEach(() => {
-  process.env = { ...saved };
+  vi.restoreAllMocks();
 });
+
+/** Makes process.exit throw so a `fail()` can be asserted, and captures stderr. */
+function trapFail() {
+  vi.spyOn(process, "exit").mockImplementation(() => {
+    throw new Error("exit");
+  });
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  return () => err.mock.calls.flat().join("\n");
+}
+
+/** The headers the generated client would send on the next request. */
+function sentHeaders(): Headers {
+  return new Headers(
+    client.getConfig().headers as ConstructorParameters<typeof Headers>[0],
+  );
+}
 
 describe("listTargets", () => {
   test("an unpinned session reaching several workspaces reads all of them", async () => {
@@ -71,7 +103,7 @@ describe("listTargets", () => {
   });
 
   test("a pinned session pins it too", async () => {
-    process.env.FT_WORKSPACE_ID = "a";
+    env.FT_WORKSPACE_ID = "a";
     expect(await listTargets(undefined)).toBeNull();
     expect(getMe).not.toHaveBeenCalled();
   });
@@ -140,7 +172,28 @@ describe("listTargets across accounts", () => {
     const targets = await listTargets(undefined);
     expect(targets?.map((t) => t.id)).toEqual(["w1", "w2"]);
     expect(err.mock.calls.flat().join(" ")).toContain("account a");
-    err.mockRestore();
+  });
+
+  test("every account failing is an error, not an empty list", async () => {
+    stored = [acct("a"), acct("b")];
+    const said = trapFail();
+    vi.mocked(getMe).mockResolvedValue({
+      error: { error: { code: "UNAUTHORIZED", message: "expired" } },
+      response: { status: 401 },
+    } as never);
+    await expect(listTargets(undefined)).rejects.toThrow("exit");
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(said()).toContain("account a: 401 UNAUTHORIZED: expired");
+    expect(said()).toContain("account b: 401 UNAUTHORIZED: expired");
+  });
+
+  test("--account with FT_API_KEY set fails instead of using the env key", async () => {
+    stored = [acct("a")];
+    env = { FT_API_KEY: "ft_live_ci" };
+    setAccountFlag("a");
+    const said = trapFail();
+    await expect(listTargets(undefined)).rejects.toThrow("exit");
+    expect(said()).toContain("FT_API_KEY overrides --account");
   });
 
   test("--workspace picks the one account that reaches it: a single call", async () => {
@@ -149,6 +202,9 @@ describe("listTargets across accounts", () => {
       .mockResolvedValueOnce(me([{ id: "w1", name: "One" }]) as never)
       .mockResolvedValueOnce(me([{ id: "w2", name: "Two" }]) as never);
     expect(await listTargets("w2")).toBeNull();
+    // The single call goes out as b, to w2.
+    expect(sentHeaders().get("Authorization")).toBe("Bearer key-b");
+    expect(sentHeaders().get("X-Workspace-Id")).toBe("w2");
   });
 
   test("--account narrows the fan-out to that account", async () => {
@@ -194,16 +250,10 @@ describe("resolveAccount", () => {
 
   test("several and none chosen: fails instead of guessing", () => {
     stored = [acct("a"), acct("b")];
-    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("exit");
-    });
-    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const said = trapFail();
     expect(() => resolveAccount()).toThrow("exit");
-    const said = err.mock.calls.flat().join("\n");
-    expect(said).toContain("a, b");
-    expect(said).toContain("--account <name>");
-    exit.mockRestore();
-    err.mockRestore();
+    expect(said()).toContain("a, b");
+    expect(said()).toContain("--account <name>");
   });
 
   test("--account resolves the ambiguity", () => {

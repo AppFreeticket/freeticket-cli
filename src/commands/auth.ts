@@ -12,6 +12,7 @@ import {
   configureClient,
   describeError,
   fail,
+  failIfNoneAnswered,
   unwrap,
 } from "../lib/api";
 import {
@@ -19,6 +20,7 @@ import {
   DEFAULT_API_URL,
   LEGACY_ACCOUNT,
   loadConfig,
+  loginTarget,
   readConfig,
   saveAccount,
   saveConfig,
@@ -68,13 +70,23 @@ export function registerAuth(program: Command): void {
         workspaceId,
       });
       const me = unwrap(await getMe({})).data;
-      const name: string = opts.account ?? me.email ?? LEGACY_ACCOUNT;
-      // Adds (or replaces) this one account; every other login stays.
-      saveAccount(name, {
-        apiKey,
-        ...(opts.url ? { apiUrl: opts.url } : {}),
-        ...(workspaceId ? { workspaceId } : {}),
-      });
+      // Adds this one account, or replaces the stored one of the same user;
+      // every other login stays.
+      const { name, replaces } = loginTarget(
+        readConfig(),
+        me.email,
+        opts.account,
+      );
+      saveAccount(
+        name,
+        {
+          apiKey,
+          ...(me.email ? { email: me.email } : {}),
+          ...(opts.url ? { apiUrl: opts.url } : {}),
+          ...(workspaceId ? { workspaceId } : {}),
+        },
+        replaces,
+      );
       // stderr so `ft login --json | jq` stays parseable.
       console.error(
         `${chalk.green("✓")} Account ${chalk.bold(name)} saved in ${chalk.dim(CONFIG_PATH)}`,
@@ -112,16 +124,18 @@ export function registerAuth(program: Command): void {
         return;
       }
       const all = [];
+      const errors: string[] = [];
       for (const account of accounts) {
         configureClient(undefined, account);
         const res = await getMe({});
         if (!res.data) {
           // One expired login does not hide the others.
-          console.error(`(account ${account.name}: ${describeError(res)})`);
+          errors.push(`account ${account.name}: ${describeError(res)}`);
           continue;
         }
         all.push({ account: account.name, ...res.data.data });
       }
+      failIfNoneAnswered(all.length, errors);
       if (opts.json) {
         print(all, { json: true });
         return;

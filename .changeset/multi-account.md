@@ -27,5 +27,12 @@ and the others stay.
   `--all` otherwise.
 
 A config written by an older CLI keeps working: its `apiKey` is read as the
-account `default`. `FT_API_KEY` still wins over everything and is a single
-account, so CI never fans out across logins stored on the machine.
+account `default`, and logging in again replaces it instead of leaving two
+accounts behind (so does re-logging in as a user already stored under another
+name). `FT_API_KEY` still wins over everything and is a single account, so CI
+never fans out across logins stored on the machine; it keeps the workspace
+pinned in the file, and `--account` alongside it is an error.
+
+If every account fails to answer, the command now fails (exit 1) naming each
+error instead of printing an empty table. An unparsable config file is reported
+instead of being silently overwritten, and the file is written atomically.

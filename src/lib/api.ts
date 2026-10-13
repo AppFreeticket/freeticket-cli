@@ -18,9 +18,12 @@ export function accountsInScope(): ResolvedAccount[] {
   try {
     return effectiveAccounts(accountFlag);
   } catch (err) {
+    const message = (err as Error).message;
     fail(
-      (err as Error).message,
-      "See them with `ft account list`; `ft account clear` unpins.",
+      message,
+      message.startsWith("No account named")
+        ? "See them with `ft account list`; `ft account clear` unpins."
+        : undefined,
     );
   }
 }
@@ -271,15 +274,17 @@ export async function listTargets(
     return null;
   }
   const perAccount = [];
+  const errors: string[] = [];
   for (const account of accounts) {
     configureClient(undefined, account);
     const res = await getMe({});
     if (!res.data) {
-      console.error(`(account ${account.name}: ${describeError(res)})`);
+      errors.push(`account ${account.name}: ${describeError(res)}`);
       continue;
     }
     perAccount.push({ account, workspaces: res.data.data.workspaces });
   }
+  failIfNoneAnswered(perAccount.length, errors);
   const targets = expandTargets(perAccount, override);
   if (override && targets.length === 0) {
     fail(
@@ -293,6 +298,20 @@ export async function listTargets(
     return null;
   }
   return targets;
+}
+
+/**
+ * Fan-out bookkeeping across accounts: the ones that failed are named on
+ * stderr, and if none answered the command fails. An empty table with exit 0
+ * would read as "you have nothing", when every login is in fact expired.
+ */
+export function failIfNoneAnswered(answered: number, errors: string[]): void {
+  if (answered === 0 && errors.length > 0)
+    fail(
+      `No account could be read:\n${errors.map((e) => `  · ${e}`).join("\n")}`,
+      "Run `ft login` again for the expired ones, or remove them with `ft account remove <name>`.",
+    );
+  for (const e of errors) console.error(`(${e})`);
 }
 
 /** True when the targets span more than one account (show an `account` column). */

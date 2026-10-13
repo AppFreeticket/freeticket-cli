@@ -149,7 +149,7 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | Variable | Default | Description |
 |---|---|---|
 | `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL (without `/api/v1`) |
-| `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key. When set it is the **only** account: stored logins are ignored, nothing fans out across them |
+| `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key. When set it is the **only** account: stored logins are ignored, nothing fans out across them, and `--account` is rejected. A workspace pinned with `ft workspace use` still applies |
 | `FT_WORKSPACE_ID` | *home* | Default active workspace |
 | `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice |
 

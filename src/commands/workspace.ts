@@ -6,6 +6,7 @@ import {
   configureClient,
   describeError,
   fail,
+  failIfNoneAnswered,
   resolveAccount,
   unwrap,
 } from "../lib/api";
@@ -49,14 +50,17 @@ export function registerWorkspace(program: Command): void {
       if (accounts.length === 0) resolveAccount(); // fails with "Not logged in"
       const withAccount = accounts.length > 1;
       const rows = [];
+      const errors: string[] = [];
+      let answered = 0;
       for (const account of accounts) {
         configureClient(undefined, account);
         const res = await getMe({});
         if (!res.data && withAccount) {
           // One expired login does not hide the other accounts' workspaces.
-          console.error(`(account ${account.name}: ${describeError(res)})`);
+          errors.push(`account ${account.name}: ${describeError(res)}`);
           continue;
         }
+        answered++;
         const me = unwrap(res).data;
         const activeId = account.workspaceId ?? me.activeWorkspaceId;
         // `role` is the EFFECTIVE role in that workspace (contract 1.7.0), not
@@ -78,6 +82,7 @@ export function registerWorkspace(program: Command): void {
                   : w.sections.join("|"),
           });
       }
+      failIfNoneAnswered(answered, errors);
       print(rows, {
         json: opts.json,
         columns: [
@@ -101,12 +106,6 @@ export function registerWorkspace(program: Command): void {
     .action(async (idOrSlug) => {
       const accounts = accountsInScope();
       if (accounts.length === 0) resolveAccount(); // fails with "Not logged in"
-      if (accounts[0]?.name === ENV_ACCOUNT) {
-        fail(
-          "FT_API_KEY is set, and that credential is not stored: there is nothing to pin.",
-          "Set FT_WORKSPACE_ID instead.",
-        );
-      }
       const slugs: string[] = [];
       for (const account of accounts) {
         configureClient(undefined, account);
@@ -123,7 +122,10 @@ export function registerWorkspace(program: Command): void {
           saveAccount(account.name, { ...stored, workspaceId: match.id });
         // With several logins the workspace only means something through the
         // account that reaches it, so that account is pinned too.
-        if (Object.keys(readConfig().accounts ?? {}).length > 1)
+        if (
+          account.name !== ENV_ACCOUNT &&
+          Object.keys(readConfig().accounts ?? {}).length > 1
+        )
           saveConfig({ activeAccount: account.name });
         console.log(
           `${chalk.green("✓")} Active workspace: ${chalk.bold(match.name)} ${chalk.dim(`(${match.slug})`)}` +
@@ -156,8 +158,10 @@ export function registerWorkspace(program: Command): void {
         saveAccount(name, { ...stored, workspaceId: undefined });
       }
       // A pinned account came with the workspace (`ft workspace use`), so it
-      // goes with it. `--account` only touches that one account.
-      if (!opts.account) saveConfig({ activeAccount: undefined });
+      // goes with it, and so does the FT_API_KEY pin. `--account` only touches
+      // that one account.
+      if (!opts.account)
+        saveConfig({ activeAccount: undefined, workspaceId: undefined });
       console.log(
         `${chalk.green("✓")} No workspace pinned: lists now read all of them.`,
       );
