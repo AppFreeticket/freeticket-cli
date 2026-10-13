@@ -11,8 +11,51 @@ import {
   getReportsSummary,
   getReportsTimeseries,
 } from "../client/sdk.gen";
-import { configureClient, unwrap } from "../lib/api";
+import {
+  configureClient,
+  describeError,
+  listTargets,
+  spansAccounts,
+  tagRow,
+  unwrap,
+} from "../lib/api";
 import { print, toCsv } from "../lib/output";
+
+/**
+ * Runs a row-shaped report against every workspace the session reads and
+ * concatenates the rows, each tagged with where it came from. Same rule as the
+ * resource lists: an unpinned account sees all of its workspaces, `--workspace`
+ * (or `ft workspace use`) narrows it back to one.
+ *
+ * `reports summary` deliberately does not use this: KPIs are an object, and
+ * adding them up across tenants means nothing.
+ */
+async function reportRows<T>(
+  workspaceFlag: string | undefined,
+  call: () => Promise<{ data?: { data: T[] }; error?: unknown }>,
+): Promise<unknown> {
+  // Without targets the client is already configured for the single call.
+  const targets = await listTargets(workspaceFlag);
+  if (!targets) {
+    const res = await call();
+    return (unwrap(res as never) as { data: T[] }).data;
+  }
+  const withAccount = spansAccounts(targets);
+  const rows: unknown[] = [];
+  for (const ws of targets) {
+    configureClient(ws.id, ws.account);
+    const res = await call();
+    if (res.error !== undefined) {
+      // One workspace failing does not cost you the rest of the report.
+      const where = withAccount ? `${ws.account.name} / ${ws.name}` : ws.name;
+      console.error(`(${where}: ${describeError(res)})`);
+      continue;
+    }
+    for (const row of res.data?.data ?? [])
+      rows.push(tagRow(ws, row as object, withAccount));
+  }
+  return rows;
+}
 
 export function registerReports(program: Command): void {
   const root = program.command("reports").description("KPIs and exports");
@@ -21,7 +64,10 @@ export function registerReports(program: Command): void {
     .command("summary")
     .description("Workspace KPI summary")
     .option("--period <p>", "7d | 30d | 90d | 1y", "30d")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureClient(opts.workspace);
@@ -43,13 +89,15 @@ export function registerReports(program: Command): void {
     .option("--provider <p>", "filter by payment provider")
     .option("--page <n>", "page number")
     .option("--page-size <n>", "rows per page")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
-      const body = unwrap(
-        await getReportsReconciliation({
+      const rows = await reportRows(opts.workspace, () =>
+        getReportsReconciliation({
           query: {
             date_from: opts.from,
             date_to: opts.to,
@@ -60,7 +108,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      printExport(body.data, opts);
+      printExport(rows, opts);
     });
 
   root
@@ -70,13 +118,15 @@ export function registerReports(program: Command): void {
     )
     .option("--event <id>", "filter by event")
     .option("--past", "only functions that already happened (settleable)")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
-      const body = unwrap(
-        await getReportsFinancials({
+      const rows = await reportRows(opts.workspace, () =>
+        getReportsFinancials({
           query: {
             event: opts.event,
             past:
@@ -88,7 +138,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      printExport(body.data, opts);
+      printExport(rows, opts);
     });
 
   root
@@ -97,17 +147,19 @@ export function registerReports(program: Command): void {
     .option("--from <date>", "created from (ISO 8601)")
     .option("--to <date>", "created to (ISO 8601)")
     .option("--status <s>", "filter by sale status")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
-      const body = unwrap(
-        await getReportsByEvent({
+      const rows = await reportRows(opts.workspace, () =>
+        getReportsByEvent({
           query: { from: opts.from, to: opts.to, status: opts.status },
         }),
       );
-      printExport(body.data, opts);
+      printExport(rows, opts);
     });
 
   root
@@ -117,13 +169,15 @@ export function registerReports(program: Command): void {
     .option("--from <date>", "created from (ISO 8601)")
     .option("--to <date>", "created to (ISO 8601)")
     .option("--event <id>", "filter by event")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
-      const body = unwrap(
-        await getReportsTimeseries({
+      const rows = await reportRows(opts.workspace, () =>
+        getReportsTimeseries({
           query: {
             interval: opts.interval,
             from: opts.from,
@@ -132,7 +186,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      printExport(body.data, opts);
+      printExport(rows, opts);
     });
 
   root
@@ -150,13 +204,15 @@ export function registerReports(program: Command): void {
     .option("--to <date>", "date to (ISO 8601)")
     .option("--include-drafts", "include draft events")
     .option("--group-by <g>", "ticketType | date | event")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
-      const body = unwrap(
-        await getReportsInventory({
+      const rows = await reportRows(opts.workspace, () =>
+        getReportsInventory({
           query: {
             eventId: opts.event ?? opts.eventId,
             eventDateId: opts.eventDate ?? opts.eventDateId,
@@ -167,7 +223,7 @@ export function registerReports(program: Command): void {
           },
         }),
       );
-      printExport(body.data, opts);
+      printExport(rows, opts);
     });
 
   const exp = root
@@ -183,7 +239,10 @@ export function registerReports(program: Command): void {
     .requiredOption("--to <date>", "date_to (ISO 8601)")
     .option("--match <status>", "filter by match_status")
     .option("--provider <p>", "filter by payment provider")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
@@ -214,7 +273,10 @@ export function registerReports(program: Command): void {
       .option("--from <date>", "created from (ISO 8601)")
       .option("--to <date>", "created to (ISO 8601)")
       .option("--status <s>", "filter by sale status")
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--json", "raw JSON output")
       .option("--csv", "CSV output (for spreadsheets/accounting)")
       .action(async (opts) => {
@@ -237,7 +299,10 @@ export function registerReports(program: Command): void {
   exp
     .command("subscribers")
     .description("Export subscribers")
-    .option("--workspace <id>", "workspace override")
+    .option(
+      "--workspace <id>",
+      "read only this workspace (default: all you can access)",
+    )
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {

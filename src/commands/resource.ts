@@ -1,6 +1,16 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: generated SDK boundary — signatures vary by resource.
+import chalk from "chalk";
 import type { Command } from "commander";
-import { configureClient, unwrap } from "../lib/api";
+import {
+  configureClient,
+  describeError,
+  fail,
+  listTargets,
+  spansAccounts,
+  splitLimit,
+  tagRow,
+  unwrap,
+} from "../lib/api";
 import { confirmOrExit, parseData } from "../lib/input";
 import {
   print,
@@ -61,20 +71,24 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
     const list = spec.list;
     const cmd = root
       .command("list")
-      .description(`List ${spec.name} from the active workspace`)
+      .description(
+        `List ${spec.name} from every workspace you can reach (--workspace narrows it to one)`,
+      )
       .option("--limit <n>", "results per page (1-100)", "20")
       .option("--cursor <id>", "pagination cursor")
       .option("--all", "auto-paginate: fetch every page (ignores --cursor)")
       .option("--columns <list>", "comma-separated columns to display")
       .option("--full", "show every field instead of the curated columns")
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--csv", "CSV output (for spreadsheets/accounting)")
       .option("--json", "raw JSON output (data only)")
       .option("--raw", "raw JSON output including pagination metadata (page)");
     for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
     cmd.action(async (opts) => {
-      configureClient(opts.workspace);
-      const columns = resolveColumns(opts, spec.columns);
+      let columns = resolveColumns(opts, spec.columns);
       const query: Record<string, unknown> = {
         limit: Number(opts.limit),
         cursor: opts.cursor,
@@ -82,6 +96,84 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       for (const f of spec.listFlags ?? []) {
         const v = opts[camel(f.query)];
         if (v !== undefined) query[f.query] = v;
+      }
+
+      // Unpinned session reaching several workspaces (or several accounts):
+      // read all of them. The fan-out lives in the client because the contract
+      // has no cross-workspace list (only `GET /staff` takes workspaceIds — see
+      // free-admin#382). Without targets the client is already configured.
+      const targets = await listTargets(opts.workspace);
+      if (targets) {
+        if (opts.cursor)
+          fail(
+            "--cursor needs a single workspace: a cursor from one workspace means nothing in another.",
+            "Pin one with --workspace <id> (or `ft workspace use <slug>`), then paginate.",
+          );
+        // With --all the limit is just the page size, so splitting it only
+        // makes the walk slower for the same rows.
+        const limit = opts.all
+          ? Number(opts.limit)
+          : splitLimit(Number(opts.limit), targets.length);
+        const withAccount = spansAccounts(targets);
+        const rows: unknown[] = [];
+        for (const ws of targets) {
+          configureClient(ws.id, ws.account);
+          let cursor: string | undefined;
+          let page:
+            | { nextCursor?: string | null; hasMore?: boolean }
+            | undefined;
+          do {
+            const res = await list({ query: { ...query, limit, cursor } });
+            if (res.error !== undefined) {
+              // One workspace failing does not cost you the other four.
+              console.error(
+                chalk.dim(
+                  `(${withAccount ? `${ws.account.name} / ` : ""}${ws.name}: ${describeError(res)})`,
+                ),
+              );
+              break;
+            }
+            const body = res.data;
+            for (const row of body?.data ?? [])
+              rows.push(tagRow(ws, row, withAccount));
+            page = body?.page;
+            cursor = page?.nextCursor ?? undefined;
+          } while (opts.all && page?.hasMore && cursor);
+        }
+        // Rounding up gives every workspace at least one row, so the aggregate
+        // can overshoot what was asked for.
+        const max = Number(opts.limit);
+        const out =
+          !opts.all && Number.isFinite(max) && max > 0
+            ? rows.slice(0, max)
+            : rows;
+        if (columns && !columns.includes("workspaceName"))
+          columns = ["workspaceName", ...columns];
+        if (columns && withAccount && !columns.includes("account"))
+          columns = ["account", ...columns];
+        if (opts.raw) {
+          print(
+            { data: out, page: { nextCursor: null, hasMore: false } },
+            { json: true },
+          );
+          return;
+        }
+        if (opts.csv) {
+          process.stdout.write(`${toCsv(out, columns)}\n`);
+          return;
+        }
+        print(out, {
+          json: opts.json,
+          columns,
+          columnsExplicit: Boolean(opts.columns),
+        });
+        if (out.length === 0)
+          console.error(
+            chalk.dim(
+              `(0 results across ${targets.length} workspaces - check them with \`ft workspace list\`)`,
+            ),
+          );
+        return;
       }
 
       if (opts.all) {
@@ -138,7 +230,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
     root
       .command("get <id>")
       .description(`Get one ${singular} by id`)
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--json", "raw JSON output")
       .action(async (id, opts) => {
         configureClient(opts.workspace);
@@ -153,7 +248,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .command("create")
       .description(`Create a ${singular}`)
       .requiredOption("--data <json>", "JSON body (inline or @file.json)")
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--json", "raw JSON output")
       .action(async (opts) => {
         configureClient(opts.workspace);
@@ -168,7 +266,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .command("update <id>")
       .description(`Update a ${singular} by id`)
       .requiredOption("--data <json>", "JSON body (inline or @file.json)")
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--json", "raw JSON output")
       .action(async (id, opts) => {
         configureClient(opts.workspace);
@@ -185,7 +286,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .command("delete <id>")
       .description(`Delete a ${singular} by id`)
       .option("--yes", "skip confirmation")
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--json", "raw JSON output")
       .action(async (id, opts) => {
         await confirmOrExit(`Delete ${singular} ${id}?`, opts.yes);
@@ -199,7 +303,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
     const cmd = root
       .command(`${action.name} <id>`)
       .description(action.describe)
-      .option("--workspace <id>", "workspace override")
+      .option(
+        "--workspace <id>",
+        "read only this workspace (default: all you can access)",
+      )
       .option("--json", "raw JSON output");
     if (action.body) {
       cmd.option("--data <json>", "JSON body (inline or @file.json)");

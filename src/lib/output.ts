@@ -133,7 +133,7 @@ export function printEmptyScope(workspaceFlag?: string): void {
     chalk.dim(
       workspaceId
         ? `(0 results in workspace ${workspaceId})`
-        : "(0 results in the session's active workspace - check it with `ft whoami`, or scope with --workspace <id>)",
+        : "(0 results in the account's default workspace - see them all with `ft workspace list`, or scope with --workspace <id>)",
     ),
   );
 }
