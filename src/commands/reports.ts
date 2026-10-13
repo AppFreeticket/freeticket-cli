@@ -15,6 +15,8 @@ import {
   configureClient,
   describeError,
   listTargets,
+  spansAccounts,
+  tagRow,
   unwrap,
 } from "../lib/api";
 import { print, toCsv } from "../lib/output";
@@ -32,22 +34,25 @@ async function reportRows<T>(
   workspaceFlag: string | undefined,
   call: () => Promise<{ data?: { data: T[] }; error?: unknown }>,
 ): Promise<unknown> {
+  // Without targets the client is already configured for the single call.
   const targets = await listTargets(workspaceFlag);
   if (!targets) {
     const res = await call();
     return (unwrap(res as never) as { data: T[] }).data;
   }
+  const withAccount = spansAccounts(targets);
   const rows: unknown[] = [];
   for (const ws of targets) {
-    configureClient(ws.id);
+    configureClient(ws.id, ws.account);
     const res = await call();
     if (res.error !== undefined) {
       // One workspace failing does not cost you the rest of the report.
-      console.error(`(${ws.name}: ${describeError(res)})`);
+      const where = withAccount ? `${ws.account.name} / ${ws.name}` : ws.name;
+      console.error(`(${where}: ${describeError(res)})`);
       continue;
     }
     for (const row of res.data?.data ?? [])
-      rows.push({ workspaceId: ws.id, workspaceName: ws.name, ...row });
+      rows.push(tagRow(ws, row as object, withAccount));
   }
   return rows;
 }
@@ -91,7 +96,6 @@ export function registerReports(program: Command): void {
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
       const rows = await reportRows(opts.workspace, () =>
         getReportsReconciliation({
           query: {
@@ -121,7 +125,6 @@ export function registerReports(program: Command): void {
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
       const rows = await reportRows(opts.workspace, () =>
         getReportsFinancials({
           query: {
@@ -151,7 +154,6 @@ export function registerReports(program: Command): void {
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
       const rows = await reportRows(opts.workspace, () =>
         getReportsByEvent({
           query: { from: opts.from, to: opts.to, status: opts.status },
@@ -174,7 +176,6 @@ export function registerReports(program: Command): void {
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
       const rows = await reportRows(opts.workspace, () =>
         getReportsTimeseries({
           query: {
@@ -210,7 +211,6 @@ export function registerReports(program: Command): void {
     .option("--json", "raw JSON output")
     .option("--csv", "CSV output (for spreadsheets/accounting)")
     .action(async (opts) => {
-      configureClient(opts.workspace);
       const rows = await reportRows(opts.workspace, () =>
         getReportsInventory({
           query: {

@@ -6,7 +6,9 @@ import {
   describeError,
   fail,
   listTargets,
+  spansAccounts,
   splitLimit,
+  tagRow,
   unwrap,
 } from "../lib/api";
 import { confirmOrExit, parseData } from "../lib/input";
@@ -86,7 +88,6 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .option("--raw", "raw JSON output including pagination metadata (page)");
     for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
     cmd.action(async (opts) => {
-      configureClient(opts.workspace);
       let columns = resolveColumns(opts, spec.columns);
       const query: Record<string, unknown> = {
         limit: Number(opts.limit),
@@ -97,9 +98,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
         if (v !== undefined) query[f.query] = v;
       }
 
-      // Unpinned session reaching several workspaces: read all of them. The
-      // fan-out lives in the client because the contract has no cross-workspace
-      // list (only `GET /staff` takes workspaceIds — see free-admin#382).
+      // Unpinned session reaching several workspaces (or several accounts):
+      // read all of them. The fan-out lives in the client because the contract
+      // has no cross-workspace list (only `GET /staff` takes workspaceIds — see
+      // free-admin#382). Without targets the client is already configured.
       const targets = await listTargets(opts.workspace);
       if (targets) {
         if (opts.cursor)
@@ -112,9 +114,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
         const limit = opts.all
           ? Number(opts.limit)
           : splitLimit(Number(opts.limit), targets.length);
+        const withAccount = spansAccounts(targets);
         const rows: unknown[] = [];
         for (const ws of targets) {
-          configureClient(ws.id);
+          configureClient(ws.id, ws.account);
           let cursor: string | undefined;
           let page:
             | { nextCursor?: string | null; hasMore?: boolean }
@@ -123,12 +126,16 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
             const res = await list({ query: { ...query, limit, cursor } });
             if (res.error !== undefined) {
               // One workspace failing does not cost you the other four.
-              console.error(chalk.dim(`(${ws.name}: ${describeError(res)})`));
+              console.error(
+                chalk.dim(
+                  `(${withAccount ? `${ws.account.name} / ` : ""}${ws.name}: ${describeError(res)})`,
+                ),
+              );
               break;
             }
             const body = res.data;
             for (const row of body?.data ?? [])
-              rows.push({ workspaceId: ws.id, workspaceName: ws.name, ...row });
+              rows.push(tagRow(ws, row, withAccount));
             page = body?.page;
             cursor = page?.nextCursor ?? undefined;
           } while (opts.all && page?.hasMore && cursor);
@@ -142,6 +149,8 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
             : rows;
         if (columns && !columns.includes("workspaceName"))
           columns = ["workspaceName", ...columns];
+        if (columns && withAccount && !columns.includes("account"))
+          columns = ["account", ...columns];
         if (opts.raw) {
           print(
             { data: out, page: { nextCursor: null, hasMore: false } },

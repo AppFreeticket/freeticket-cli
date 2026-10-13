@@ -59,12 +59,19 @@ ft login
 # CI / automation: skip the browser with a backend-issued key instead.
 #   ft login --key ft_live_xxxxx
 
-# 2. Who am I, and which workspaces can I access?
+# More than one FreeTicket login? Each `ft login` ADDS an account (named after
+# its email, or `--account <name>`); the others stay.
+#   ft login --account agency
+
+# 2. Who am I, and which workspaces can I access? (one row per account)
 ft whoami
 
-# 3. Optional: pin one workspace (persisted locally). Without this, the lists
-#    and the row-shaped reports read EVERY workspace you can access and tag
-#    each row with the one it came from. `ft workspace clear` unpins.
+# 3. Optional: narrow it down (persisted locally). Without this, the lists and
+#    the row-shaped reports read EVERY account and EVERY workspace each one
+#    reaches, tagging each row with `workspaceName` (and `account` when there
+#    are several). `ft workspace clear` / `ft account clear` unpin.
+ft account list
+ft account use agency
 ft workspace list
 ft workspace use my-workspace-slug
 
@@ -78,10 +85,11 @@ ft sales list --status CONFIRMED --json
 
 | Command | What it does | Minimum role |
 |---|---|---|
-| `ft login` | Browser login (device flow); `--key <key>` for CI | VIEWER |
-| `ft whoami` | Active user and accessible workspaces | VIEWER |
-| `ft config` · `ft logout` | Show config (masked key) · remove key | — |
-| `ft workspace list` · `use <id\|slug>` · `clear` · `show` | List workspaces, pin one, unpin, show the current one | VIEWER |
+| `ft login` | Add an account: browser login (device flow), `--key <key>` for CI, `--account <name>` to name it (default: its email) | VIEWER |
+| `ft whoami` | User and accessible workspaces of every account in scope | VIEWER |
+| `ft account list` · `use <name>` · `clear` · `remove <name>` | Stored accounts: list, pin one, unpin (read all), remove | — |
+| `ft config` · `ft logout` | Show config (masked keys) · remove the pinned/only account (`--account <name>`, `--all`) | — |
+| `ft workspace list` · `use <id\|slug>` · `clear` · `show` | List workspaces of every account, pin one (and its account), unpin, show the current one | VIEWER |
 | `ft events list` · `get <id>` | Workspace events (`--q` `--status` `--with-total`) | VIEWER |
 | `ft events create` · `update <id>` · `delete <id>` | Manage events (`--data <json>`) | ADMIN |
 | `ft events publish <id>` | Publish an event | ADMIN |
@@ -122,6 +130,7 @@ ft sales list --status CONFIRMED --json
 |---|---|---|
 | `--json` | all commands | Raw JSON, ideal for `jq`/scripts. On **lists this is the data array only** — use `--raw` for the paginated envelope |
 | `--workspace <id>` | all commands | Read only this workspace. Lists and row-shaped reports otherwise cover **every workspace you can access**, tagging rows with `workspaceId`/`workspaceName` |
+| `--account <name>` | all commands | Use only this stored account. Lists otherwise read **every account** (rows get an `account` column); commands that are not lists need exactly one account, so with several stored they fail until you pass `--account` or `ft account use <name>` |
 | `--limit <n>` `--cursor <id>` | list commands | Cursor pagination (1-100, default 20). Across workspaces the limit is split between them; `--cursor` needs a single workspace, since a cursor from one means nothing in another |
 | `--all` | list commands | Auto-paginate: fetch every page (ignores `--cursor`) |
 | `--raw` | list commands | JSON `{ data, page }` envelope, including `page.nextCursor` for scripted pagination |
@@ -140,9 +149,14 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | Variable | Default | Description |
 |---|---|---|
 | `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL (without `/api/v1`) |
-| `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key |
+| `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key. When set it is the **only** account: stored logins are ignored, nothing fans out across them |
 | `FT_WORKSPACE_ID` | *home* | Default active workspace |
 | `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice |
+
+Logins are stored per account under `accounts` in `~/.freeticket/config.json`
+(`activeAccount` is the one pinned with `ft account use`). A file written by an
+older CLI, with a single top-level `apiKey`, is read as the account `default`
+and rewritten in the new layout on the next save.
 
 The `~/.freeticket/config.json` file is created with `0600` permissions (only
 your user can read it) because it stores your credentials. See [`.env.example`](./.env.example).

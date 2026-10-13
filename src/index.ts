@@ -52,6 +52,7 @@ import {
   postVenues,
   postWebhooks,
 } from "./client/sdk.gen";
+import { registerAccount } from "./commands/account";
 import { registerAdmin } from "./commands/admin";
 import { registerApiKeys } from "./commands/api-keys";
 import { registerAuth } from "./commands/auth";
@@ -60,7 +61,12 @@ import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
 import { registerWorkspace } from "./commands/workspace";
-import { configureClient, signedDownload, unwrap } from "./lib/api";
+import {
+  configureClient,
+  setAccountFlag,
+  signedDownload,
+  unwrap,
+} from "./lib/api";
 import { banner } from "./lib/banner";
 import { parseData } from "./lib/input";
 import { print } from "./lib/output";
@@ -75,6 +81,7 @@ program
   .addHelpText("beforeAll", banner());
 
 registerAuth(program);
+registerAccount(program);
 registerWorkspace(program);
 
 registerResource(program, {
@@ -367,6 +374,25 @@ registerTickets(program);
 registerReports(program);
 registerApiKeys(program);
 registerAdmin(program);
+
+// `--account <name>` goes wherever `--workspace` does: both narrow what one
+// command reads or acts on. Added here in one pass instead of next to every
+// `--workspace` so no command family can miss it. `admin` is skipped: its
+// `--workspace` is a filter and it authenticates with a superadmin session.
+function addAccountOption(cmd: Command): void {
+  if (cmd.name() === "admin") return;
+  const longs = cmd.options.map((o) => o.long);
+  if (longs.includes("--workspace") && !longs.includes("--account"))
+    cmd.option(
+      "--account <name>",
+      "use only this stored account (default: all of them; see `ft account list`)",
+    );
+  for (const sub of cmd.commands) addAccountOption(sub);
+}
+addAccountOption(program);
+program.hook("preAction", (_program, action) => {
+  setAccountFlag(action.opts().account);
+});
 
 // No arguments -> banner + help.
 if (process.argv.length <= 2) {
