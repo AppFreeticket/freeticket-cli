@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- 0e8f8ae: Logging in gives you every workspace, not the first one.
+
+  `ft login` used to quietly make `workspaces[0]` the active workspace and write
+  it to `~/.freeticket/config.json`. Somebody who belonged to five tenants saw
+  one of them and had no reason to suspect the other four existed — every list,
+  every report, every empty result was scoped to a workspace nobody chose.
+
+  Now a login pins nothing, and the commands widen to match:
+
+  - `ft <resource> list` reads **every workspace the credential reaches** and tags
+    each row with `workspaceId` / `workspaceName`. `--limit` is split between the
+    workspaces, so `--limit 20` is still 20 rows and not 20 per tenant.
+  - The row-shaped reports — `by-event`, `timeseries`, `inventory`, `financials`,
+    `reconciliation` — aggregate the same way. `reports summary` does not: KPIs
+    are an object, and adding them up across tenants means nothing.
+  - A workspace that errors is reported on stderr and the rest still print.
+
+  Pinning is now opt-in and reversible: `--workspace <id>` for one command,
+  `ft workspace use <slug>` to persist it, `ft workspace clear` to go back to all
+  of them. A pinned session behaves exactly as before, and pinning is what deep
+  pagination needs — `--cursor` now says so instead of silently paging one
+  workspace, because a cursor from one workspace means nothing in another.
+
+  Commands that are not lists still resolve to the account's default workspace,
+  which is what `/api/v1` does when `X-Workspace-Id` is absent.
+
+- cce7ed4: Several accounts, nested: every list reads all of them by default.
+
+  `ft login` used to replace whatever session was stored, so somebody with two
+  FreeTicket logins (their own organization and an agency, say) had to log out
+  and back in to look at the other one. Now each login **adds an account** to
+  `~/.freeticket/config.json`, named after its email (or `--account <name>`),
+  and the others stay.
+
+  - With nothing pinned, `ft <resource> list` and the row-shaped reports read
+    **every account × every workspace it reaches**. Rows carry `account` (when
+    more than one is involved) next to `workspaceId` / `workspaceName`. A
+    workspace two accounts both reach is read once. `--limit` is split across all
+    of them, and an account or workspace that fails is named on stderr while the
+    rest still print.
+  - `ft account list|use|clear|remove` manages them; `--account <name>` narrows any
+    command to one, wherever `--workspace` is accepted.
+  - Commands that are not lists (`get`, `create`, `update`, `delete`, `tickets checkin`,
+    `reports summary`, ...) need exactly one account. With several stored and none
+    chosen they stop and name them instead of guessing.
+  - `ft whoami` and `ft workspace list` show every account; `ft workspace use`
+    finds the workspace in whichever account reaches it and pins both.
+  - `ft logout` removes the pinned (or only) account; `--account <name>` and
+    `--all` otherwise.
+
+  A config written by an older CLI keeps working: its `apiKey` is read as the
+  account `default`, and logging in again replaces it instead of leaving two
+  accounts behind (so does re-logging in as a user already stored under another
+  name). `FT_API_KEY` still wins over everything and is a single account, so CI
+  never fans out across logins stored on the machine; it keeps the workspace
+  pinned in the file, and `--account` alongside it is an error.
+
+  If every account fails to answer, the command now fails (exit 1) naming each
+  error instead of printing an empty table. An unparsable config file is reported
+  instead of being silently overwritten, and the file is written atomically.
+
 ## 0.9.0
 
 ### Minor Changes
