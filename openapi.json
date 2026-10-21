@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket B2B API",
-    "version": "1.19.0",
+    "version": "1.20.0",
     "description": "FreeTicket B2B REST API for integrations and the CLI. Authentication is by API key (`Authorization: Bearer <key>` header or `x-api-key`); the active workspace is selected with the `X-Workspace-Id` header.\n\nScopes: each key is either `read` (GET/HEAD only) or `write` (additionally creates, edits, deletes, cancels, refunds and checks in). Self-service keys are issued as `read`. A `read` key calling a mutating method gets a 403. The machine-readable declaration lives at `/.well-known/oauth-protected-resource` (RFC 9728)."
   },
   "servers": [
@@ -1523,6 +1523,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request body/parameter validation failed.",
             "content": {
@@ -1945,6 +1955,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request body/parameter validation failed.",
             "content": {
@@ -2024,6 +2044,16 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2365,6 +2395,16 @@
           },
           "422": {
             "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The external provider failed to complete the operation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3206,6 +3246,16 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5328,6 +5378,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request: malformed parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid credential.",
             "content": {
@@ -5461,6 +5521,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request: malformed parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid credential.",
             "content": {
@@ -5577,6 +5647,16 @@
                   "required": [
                     "data"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: malformed parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -5715,6 +5795,16 @@
                     "data",
                     "page"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: malformed parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -7122,6 +7212,16 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "The external provider failed to complete the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -7489,7 +7589,7 @@
           }
         ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -8535,6 +8635,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request body/parameter validation failed.",
             "content": {
@@ -8880,6 +8990,16 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9823,6 +9943,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request: malformed parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid credential.",
             "content": {
@@ -9845,6 +9975,16 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10172,6 +10312,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Service unavailable: an external dependency is down or initialization failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -10252,6 +10402,16 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12389,8 +12549,7 @@
         },
         "required": [
           "startsAt",
-          "timezone",
-          "streamType"
+          "timezone"
         ],
         "additionalProperties": false
       },
