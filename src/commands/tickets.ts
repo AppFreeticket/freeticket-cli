@@ -1,10 +1,12 @@
 import type { Command } from "commander";
 import {
   getTicketsTicketCodeAccess,
+  patchTicketsTicketCode,
   postTicketsTicketCodeCheckin,
   postTicketsTicketCodeResend,
 } from "../client/sdk.gen";
 import { configureClient, unwrap } from "../lib/api";
+import { parseData } from "../lib/input";
 import { print } from "../lib/output";
 
 /**
@@ -15,7 +17,9 @@ import { print } from "../lib/output";
 export function registerTickets(program: Command): void {
   const root = program
     .command("tickets")
-    .description("Individual tickets: door check-in, access status, QR resend");
+    .description(
+      "Individual tickets: door check-in, access status, QR resend, reassign",
+    );
 
   root
     .command("access <code>")
@@ -40,7 +44,12 @@ export function registerTickets(program: Command): void {
     .action(async (code, opts) => {
       configureClient(opts.workspace);
       const body = unwrap(
-        await postTicketsTicketCodeCheckin({ path: { ticketCode: code } }),
+        // The contract marks the body required since 1.19 (optional `source`
+        // of the scanned QR); the backend accepts it empty.
+        await postTicketsTicketCodeCheckin({
+          path: { ticketCode: code },
+          body: {},
+        }),
       );
       print(body.data ?? body, { json: opts.json });
     });
@@ -54,6 +63,29 @@ export function registerTickets(program: Command): void {
       configureClient(opts.workspace);
       const body = unwrap(
         await postTicketsTicketCodeResend({ path: { ticketCode: code } }),
+      );
+      print(body.data ?? body, { json: opts.json });
+    });
+
+  // Postponements: move an already sold ticket to another date and/or ticket
+  // type without refunding and reselling. With only eventDateId the backend
+  // resolves the type by name on the new date (422 if ambiguous: pass
+  // ticketTypeId). It does not charge or refund any price difference.
+  root
+    .command("reassign <code>")
+    .description(
+      'Move a sold ticket to another date/type (--data \'{"eventDateId":"…"}\' and/or "ticketTypeId", "seatLabel")',
+    )
+    .requiredOption("--data <json>", "JSON body (inline or @file.json)")
+    .option("--workspace <id>", "workspace override")
+    .option("--json", "raw JSON output")
+    .action(async (code, opts) => {
+      configureClient(opts.workspace);
+      const body = unwrap(
+        await patchTicketsTicketCode({
+          path: { ticketCode: code },
+          body: parseData(opts.data) as never,
+        }),
       );
       print(body.data ?? body, { json: opts.json });
     });

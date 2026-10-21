@@ -6,6 +6,7 @@ import {
   getMe,
   postAuthDeviceCode,
   postAuthDeviceToken,
+  postAuthSignup,
 } from "../client/sdk.gen";
 import {
   accountsInScope,
@@ -106,6 +107,52 @@ export function registerAuth(program: Command): void {
         );
       }
       print(me, { json: opts.json });
+    });
+
+  // Headless onboarding (contract 1.19): verify-first, so no credential comes
+  // back. The email verifies the account and sets the password; after that the
+  // same person approves an `ft login` in the browser. Public endpoint, no
+  // stored account needed. Same 202 for an existing email (no enumeration).
+  program
+    .command("signup")
+    .description(
+      "Create a FreeTicket account (sends a verification email; then run `ft login`)",
+    )
+    .requiredOption("--email <email>", "account email")
+    .requiredOption("--name <name>", "your name")
+    .option(
+      "--workspace-name <name>",
+      "also create your first workspace (free Spark plan)",
+    )
+    .option(
+      "--url <url>",
+      "API base URL (default: https://admin.appfreeticket.com)",
+    )
+    .option("--json", "raw JSON output")
+    .action(async (opts) => {
+      const apiUrl: string = (
+        opts.url ??
+        process.env.FT_API_URL ??
+        readConfig().apiUrl ??
+        DEFAULT_API_URL
+      ).replace(/\/$/, "");
+      // Anonymous client, like the device flow: signup carries no auth header.
+      client.setConfig({ baseUrl: `${apiUrl}/api/v1` });
+      const body = unwrap(
+        await postAuthSignup({
+          body: {
+            email: opts.email,
+            name: opts.name,
+            ...(opts.workspaceName
+              ? { workspaceName: opts.workspaceName }
+              : {}),
+          },
+        }),
+      );
+      console.error(
+        `${chalk.green("✓")} Check ${chalk.bold(opts.email)} to verify the account and set a password, then run ${chalk.cyan("ft login")}.`,
+      );
+      print(body, { json: opts.json });
     });
 
   program

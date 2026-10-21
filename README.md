@@ -85,40 +85,44 @@ ft sales list --status CONFIRMED --json
 
 | Command | What it does | Minimum role |
 |---|---|---|
+| `ft signup --email <e> --name <n>` | Create an account (`--workspace-name` also creates the first workspace); verify via email, then `ft login` | — |
 | `ft login` | Add an account: browser login (device flow), `--key <key>` for CI, `--account <name>` to name it (default: its email) | VIEWER |
 | `ft whoami` | User and accessible workspaces of every account in scope | VIEWER |
 | `ft account list` · `use <name>` · `clear` · `remove <name>` | Stored accounts: list, pin one, unpin (read all), remove | — |
 | `ft config` · `ft logout` | Show config (masked keys) · remove the pinned/only account (`--account <name>`, `--all`) | — |
 | `ft workspace list` · `use <id\|slug>` · `clear` · `show` | List workspaces of every account, pin one (and its account), unpin, show the current one | VIEWER |
+| `ft workspace create --name <n> --slug <s>` | Create your own workspace; you become its ADMIN (plan quota applies) | — |
 | `ft events list` · `get <id>` | Workspace events (`--q` `--status` `--with-total`) | VIEWER |
 | `ft events create` · `update <id>` · `delete <id>` | Manage events (`--data <json>`) | ADMIN |
-| `ft events publish <id>` | Publish an event | ADMIN |
+| `ft events publish <id>` · `cancel <id>` | Publish an event · cancel it and all its dates, keeping sales and tickets (no refunds; `--yes` skips the prompt) | ADMIN |
 | `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
 | `ft ticket-types list` · `get <id>` | Ticket types (`--event-date-id`) | VIEWER |
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
 | `ft sales list` · `get <id>` | Sales (filters: `--status` `--channel` `--event` `--event-date` `--reference` `--buyer` `--from` `--to`) | STAFF |
 | `ft sales create` | Create a sale/order — comps & programmatic sales (`--data <json>`) | ADMIN |
 | `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for the `acknowledge_open_payment` / `acknowledge_manual` flags) | ADMIN |
-| `ft sales tickets <id>` | List the individual tickets/attendees of a sale | STAFF |
+| `ft sales tickets <id>` · `attempts <id>` | Tickets/attendees of a sale · its payment attempt history (why it did not go through) | STAFF |
 | `ft tickets access <code>` | Read a ticket's access status (no admit) | STAFF |
 | `ft tickets checkin <code>` | Admit a ticket at the door (idempotent) | STAFF |
 | `ft tickets resend <code>` | Resend the ticket's confirmation email (QR) | ADMIN |
+| `ft tickets reassign <code>` | Move a sold ticket to another date and/or type (`--data '{"eventDateId":"…"}'`; no price difference charged/refunded) | ADMIN |
 | `ft plans list` · `get <id>` | Membership plans | VIEWER |
 | `ft plans create` · `update <id>` · `delete <id>` | Manage membership plans (`--data <json>`) | ADMIN |
 | `ft plans subscribers <id>` | List a plan's subscribers/members | VIEWER |
 | `ft subscriptions cancel <id>` | Cancel a subscription | ADMIN |
 | `ft discounts list` · `create` · `update <id>` · `delete <id>` | Discount codes / coupons (`--event` `--active`; `--data <json>`) | ADMIN |
-| `ft webhooks list` · `create` · `delete <id>` | Webhook endpoints, HMAC-signed delivery (`--data <json>`) | ADMIN |
+| `ft webhooks list` · `create` · `update <id>` · `delete <id>` | Webhook endpoints, HMAC-signed delivery (`--data <json>`) | ADMIN |
 | `ft venues list` · `get <id>` | Venues | VIEWER |
 | `ft venues create` · `update <id>` · `delete <id>` | Manage venues (`--data <json>`) | ADMIN |
-| `ft staff list` · `create` · `set-role <id>` | Workspace staff (`--workspace-ids <ids>` lists up to 25 workspaces in one call; `--data <json>`) | ADMIN |
+| `ft staff list` · `get <id>` · `create` · `set-role <id>` · `delete <id>` | Workspace staff (`--workspace-ids <ids>` lists up to 25 workspaces in one call; `--data <json>`) | ADMIN |
 | `ft reports summary` | KPIs (`--period 7d\|30d\|90d\|1y`) | VIEWER |
 | `ft reports by-event` · `timeseries` · `inventory` | Revenue/tickets by event, over time, and capacity/availability | VIEWER |
 | `ft reports export buyers\|attendees\|subscribers\|reconciliation` | Exports as CSV (filters `--event` `--event-date` `--from` `--to` `--status`) | ADMIN |
 | `ft reports reconciliation` · `financials` | CFO reconciliation (Mercado Pago vs sale vs Siigo invoice) · per-function P&L | ADMIN |
-| `ft settlements list` · `document <id>` | Settlements paid to the organizer · signed download URL for the PDF, 5 min TTL (`--proof <fileName>` for a payment proof) | ADMIN |
+| `ft settlements list` · `get <id>` · `document <id>` | Settlements paid to the organizer · signed download URL for the PDF, 5 min TTL (`--proof <fileName>` for a payment proof) | ADMIN |
+| `ft content-videos list` · `content-posts list\|create` · `content-lives list\|get\|playback-token` | Organization content; `content-posts create --data` publishes a post or article | ADMIN |
 | `ft api-keys create <name>` · `list` · `revoke <id>` | Self-service API keys (the secret is shown once, never stored) | ADMIN |
-| `ft admin login` · `me` · `workspaces` · `users` · `plans` · `feature-flags` · `tokens` · `audit-log` | Superadmin, cross-tenant — needs a SUPER_ADMIN session, not an API key. Includes `admin workspaces plan <id>` (assisted plan assignment) and `webTemplate` / `customDomain` on `update` | SUPER_ADMIN |
+| `ft admin login` · `me` · `workspaces` · `users` · `plans` · `feature-flags` · `tokens` · `audit-log` | Superadmin, cross-tenant — needs a SUPER_ADMIN session, not an API key. Includes `admin workspaces plan <id>` (assisted plan assignment), `plan-show <id>` (current plan) and `delete <id>` (soft delete; suspend first) and `webTemplate` / `customDomain` on `update` | SUPER_ADMIN |
 
 > **Write operations** (`create`/`update`/`delete` and actions like `publish`,
 > `cancel`, `refund`) send a JSON body via `--data <inline-json>` or
@@ -151,7 +155,7 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL (without `/api/v1`) |
 | `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key. When set it is the **only** account: stored logins are ignored, nothing fans out across them, and `--account` is rejected. A workspace pinned with `ft workspace use` still applies |
 | `FT_WORKSPACE_ID` | *home* | Default active workspace |
-| `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice |
+| `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice (checked at most once a day; also off in CI, without a TTY, and with `--json`/`--raw`/`--csv`) |
 
 Logins are stored per account under `accounts` in `~/.freeticket/config.json`
 (`activeAccount` is the one pinned with `ft account use`). A file written by an

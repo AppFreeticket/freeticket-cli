@@ -3,6 +3,7 @@ import chalk from "chalk";
 import type { Command } from "commander";
 import {
   deleteTokensId,
+  deleteWorkspacesId,
   getAuditLog,
   getFeatureFlags,
   getMe,
@@ -13,6 +14,7 @@ import {
   getUsersId,
   getWorkspaces,
   getWorkspacesId,
+  getWorkspacesIdPlan,
   patchPlatformPlansId,
   patchUsersId,
   patchWorkspacesId,
@@ -193,6 +195,24 @@ export function registerAdmin(program: Command): void {
             'Assign a platform plan manually (--data \'{"planSlug":"spark|star|icon|legend"}\')',
           fn: postWorkspacesIdPlan,
           body: true,
+          confirm: true,
+        },
+        {
+          // `plan <id>` is the POST that assigns one, so the read gets its own
+          // verb. `stripeLinked: true` means `plan` will cancel that Stripe
+          // subscription first.
+          name: "plan-show",
+          describe: "Current plan and subscription of a workspace",
+          fn: getWorkspacesIdPlan,
+        },
+        {
+          // Soft delete: sets deletedAt, keeps sales/buyers/tickets. The
+          // backend requires the workspace to be suspended first and to have no
+          // CONFIRMED sale (409 otherwise). Does not cancel Stripe.
+          name: "delete",
+          describe:
+            "Soft-delete a workspace (must be suspended first, no confirmed sales)",
+          fn: deleteWorkspacesId,
           confirm: true,
         },
       ],

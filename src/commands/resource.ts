@@ -32,6 +32,8 @@ interface ActionSpec {
   fn: SdkFn;
   /** When true, the action accepts a `--data` JSON body (e.g. refund amount). */
   body?: boolean;
+  /** Destructive: ask before running, `--yes` skips it (same gate as delete). */
+  confirm?: boolean;
 }
 
 interface ResourceSpec {
@@ -311,7 +313,10 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
     if (action.body) {
       cmd.option("--data <json>", "JSON body (inline or @file.json)");
     }
+    if (action.confirm) cmd.option("--yes", "skip confirmation");
     cmd.action(async (id, opts) => {
+      if (action.confirm)
+        await confirmOrExit(`${action.name} ${singular} ${id}?`, opts.yes);
       configureClient(opts.workspace);
       const payload: Record<string, unknown> = { path: { id } };
       if (action.body && opts.data) payload.body = parseData(opts.data);

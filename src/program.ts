@@ -6,6 +6,7 @@ import {
   deleteEventsId,
   deleteEventsIdDatesDateId,
   deleteMembershipPlansId,
+  deleteStaffId,
   deleteTicketTypesId,
   deleteVenuesId,
   deleteWebhooksId,
@@ -22,9 +23,12 @@ import {
   getMembershipPlansIdSubscribers,
   getSales,
   getSalesId,
+  getSalesIdAttempts,
   getSalesIdTickets,
   getSettlements,
+  getSettlementsId,
   getStaff,
+  getStaffId,
   getTicketTypes,
   getTicketTypesId,
   getVenues,
@@ -37,9 +41,12 @@ import {
   patchStaffIdRole,
   patchTicketTypesId,
   patchVenuesId,
+  patchWebhooksId,
   postContentPlaybackToken,
+  postContentPosts,
   postDiscounts,
   postEvents,
+  postEventsIdCancel,
   postEventsIdDates,
   postEventsIdPublish,
   postMembershipPlans,
@@ -97,6 +104,16 @@ registerResource(program, {
   del: deleteEventsId,
   actions: [
     { name: "publish", describe: "Publish an event", fn: postEventsIdPublish },
+    {
+      // Unlike delete, cancel keeps the event, its sales and tickets (every
+      // date goes CANCELLED, the waiting room turns off). It refunds nothing:
+      // that is `ft sales refund`. Idempotent on the backend, but still asks.
+      name: "cancel",
+      describe:
+        "Cancel an event and all its dates (keeps sales/tickets; no refunds)",
+      fn: postEventsIdCancel,
+      confirm: true,
+    },
   ],
   // startsAt lives on EventDate, not Event — use createdAt for a temporal column.
   columns: ["id", "name", "status", "createdAt"],
@@ -122,6 +139,7 @@ registerResource(program, {
   name: "settlements",
   describe: "Settlements paid to the organizer",
   list: getSettlements,
+  get: getSettlementsId,
   columns: ["id", "reference", "status", "amount", "currency", "createdAt"],
   listFlags: [
     { flag: "--event <id>", describe: "filter by event", query: "event" },
@@ -183,6 +201,14 @@ registerResource(program, {
       name: "tickets",
       describe: "List the individual tickets/attendees of a sale",
       fn: getSalesIdTickets,
+    },
+    {
+      // Answers "why didn't this sale go through?": one row per gateway
+      // movement (approved, declined, refunded), newest first (contract 1.19).
+      name: "attempts",
+      describe:
+        "Payment attempt history of a sale (declines, approvals, refunds)",
+      fn: getSalesIdAttempts,
     },
   ],
   columns: ["id", "reference", "status", "total", "currency", "createdAt"],
@@ -277,6 +303,8 @@ registerResource(program, {
   describe: "Webhook endpoints (HMAC-signed event delivery)",
   list: getWebhooks,
   create: postWebhooks,
+  // PATCH keeps the signingSecret; delete + create would rotate it.
+  update: patchWebhooksId,
   del: deleteWebhooksId,
   columns: ["id", "url", "events", "active", "createdAt"],
 });
@@ -308,7 +336,11 @@ registerResource(program, {
   name: "staff",
   describe: "Workspace staff",
   list: getStaff,
+  get: getStaffId,
   create: postStaff,
+  // Revokes access to THIS workspace only; the account and its other
+  // workspaces stay. An ADMIN cannot revoke another admin (403) or itself (409).
+  del: deleteStaffId,
   actions: [
     {
       name: "set-role",
@@ -329,9 +361,10 @@ registerResource(program, {
 });
 
 // Content lives on the B2B contract since 1.7.0 (free-admin#356) and the mcp
-// already exposed it; only the CLI was missing it (issue #40). Read-only:
-// videos/posts/lives are listings, and playback-token is an action that mints a
-// short-lived signed URL, so it goes under `lives` rather than as a CRUD verb.
+// already exposed it; only the CLI was missing it (issue #40). Videos and lives
+// are read-only listings; posts gained `create` in contract 1.19. playback-token
+// is an action that mints a short-lived signed URL, so it goes under `lives`
+// rather than as a CRUD verb.
 registerResource(program, {
   name: "content-videos",
   describe: "Organization videos",
@@ -343,6 +376,9 @@ registerResource(program, {
   name: "content-posts",
   describe: "Organization posts",
   list: getContentPosts,
+  // type=ARTICLE needs title + body (Markdown); TEXT/IMAGE need content or
+  // imageUrl. Minimum role ADMIN (contract 1.19).
+  create: postContentPosts,
   columns: ["id", "title", "publishedAt", "memberOnly"],
 });
 
