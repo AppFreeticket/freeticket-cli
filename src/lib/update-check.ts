@@ -59,7 +59,11 @@ export function updateCheckDisabled(
 /** Latest version from cache (fresh ≤ 1 day) or the npm registry. */
 async function getLatest(): Promise<string | null> {
   const cached = readCache();
-  if (cached && Date.now() - cached.at < ONE_DAY) return cached.latest;
+  const now = Date.now();
+  // A timestamp in the future (clock skew, hand-edited file) is stale, not
+  // fresh forever: `now - at` would stay negative and never reach ONE_DAY.
+  if (cached && cached.at <= now && now - cached.at < ONE_DAY)
+    return cached.latest;
 
   const res = await fetch(REGISTRY, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT),
