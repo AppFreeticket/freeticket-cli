@@ -1,14 +1,15 @@
-# Agentes del repo `freeticket-cli`
+# Agents for the `freeticket-cli` repo
 
-Subagentes de Claude Code para la revisión e integración continua de este CLI.
-Cada uno tiene un disparador claro; no hay agentes de relleno.
+Claude Code subagents for reviewing and continuously integrating this CLI. Each
+one has a clear trigger; there are no filler agents.
 
-| Agente | Cuándo usarlo |
+| Agent | When to use it |
 |---|---|
-| [`ts-cli-reviewer`](./ts-cli-reviewer.md) | Revisar un PR o cambio en `src/` antes de mergear. |
-| [`openapi-sync`](./openapi-sync.md) | El backend cambió la API; regenerar y validar el cliente. |
-| [`cli-qa`](./cli-qa.md) | Antes de publicar o al agregar un comando: tests e integración. |
-| [`release-devops`](./release-devops.md) | Preparar y verificar un release a npm. |
+| [`ts-cli-reviewer`](./ts-cli-reviewer.md) | Review a pull request or a change under `src/` before merging. |
+| [`openapi-sync`](./openapi-sync.md) | The backend changed a contract; regenerate and validate the client. |
+| [`cli-qa`](./cli-qa.md) | Before publishing, or when adding a command: tests and integration. |
+| [`release-devops`](./release-devops.md) | Prepare and verify an npm release. |
 
-Invocación: en Claude Code, el agente se elige por su disparador o con el
-selector de subagentes. Todos operan dentro de este repo.
+For cross-repo work (propagating a contract to every client, requesting a
+missing endpoint, OSS hygiene), the agents live one level up, in the `ai-native`
+umbrella.
