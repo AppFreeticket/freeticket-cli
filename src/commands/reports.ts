@@ -264,7 +264,9 @@ export function registerReports(program: Command): void {
   for (const [name, fn, label] of [
     ["buyers", getReportsExportsBuyers, "buyers (one row per sale)"],
     ["attendees", getReportsExportsAttendees, "attendees (one row per ticket)"],
-  ] as const) {
+    // The two responses differ in row shape since the contract typed them
+    // (1.19); printExport only needs rows, so they share one signature here.
+  ] as [string, typeof getReportsExportsBuyers, string][]) {
     exp
       .command(name)
       .description(`Export ${label}`)
