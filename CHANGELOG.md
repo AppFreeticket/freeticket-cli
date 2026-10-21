@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1
+
+### Patch Changes
+
+- 2fc1604: Sync the bundled OpenAPI contract to v1 1.20.0 and admin 1.5.1 (documented error codes, optional `streamType` and check-in body).
+
 ## 0.11.0
 
 ### Minor Changes
