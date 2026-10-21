@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import type { Command } from "commander";
-import { getMe } from "../client/sdk.gen";
+import { getMe, postWorkspaces } from "../client/sdk.gen";
 import {
   accountsInScope,
   configureClient,
@@ -19,8 +19,8 @@ import {
 import { print } from "../lib/output";
 
 /**
- * `ft workspace list|use|clear|show`: pin, unpin and inspect the workspace.
- * Everything comes from GET /me (workspaces[] + activeWorkspaceId).
+ * `ft workspace list|use|clear|show|create`: pin, unpin, inspect and create
+ * workspaces. Reads come from GET /me (workspaces[] + activeWorkspaceId).
  *
  * Pinning is **opt-in**: by default nothing is stored, the lists read every
  * workspace the account reaches and the rest of the commands fall back to the
@@ -35,7 +35,7 @@ import { print } from "../lib/output";
 export function registerWorkspace(program: Command): void {
   const root = program
     .command("workspace")
-    .description("List, pin, unpin, and show workspaces");
+    .description("List, pin, unpin, show, and create workspaces");
 
   root
     .command("list")
@@ -188,5 +188,31 @@ export function registerWorkspace(program: Command): void {
         );
       }
       print(active, { json: opts.json });
+    });
+
+  // Self-serve tenant (contract 1.19): the caller becomes its ADMIN. Goes to the
+  // caller's own Organization when there is one (plan quota: spark=1, star=3,
+  // icon=7), or to a new one on the free Spark plan. X-Workspace-Id does not
+  // apply. Someone who is staff in another tenant gets 409 ALREADY_HAS_ACCESS.
+  root
+    .command("create")
+    .description("Create your own workspace (you become its ADMIN)")
+    .requiredOption("--name <name>", "workspace name")
+    .requiredOption("--slug <slug>", "URL slug (lowercase, digits, dashes)")
+    .option(
+      "--account <name>",
+      "the account to create it with (needed when several are stored)",
+    )
+    .option("--json", "raw JSON output")
+    .action(async (opts) => {
+      const account = resolveAccount();
+      configureClient(undefined, account);
+      const body = unwrap(
+        await postWorkspaces({ body: { name: opts.name, slug: opts.slug } }),
+      );
+      console.error(
+        `${chalk.green("✓")} Workspace ${chalk.bold(opts.name)} created. ${chalk.dim(`Pin it with \`ft workspace use ${opts.slug}\`.`)}`,
+      );
+      print(body?.data ?? body, { json: opts.json });
     });
 }

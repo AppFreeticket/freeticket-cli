@@ -22,3 +22,27 @@ test("every command that takes --workspace also takes --account (admin aside)", 
   // Guard against the walk finding nothing at all.
   expect(walk(program).length).toBeGreaterThan(20);
 });
+
+test("contract 1.19 / admin 1.5 commands are wired, destructive ones behind --yes", () => {
+  const tree = new Map(walk(program));
+  const expected = [
+    "events cancel",
+    "sales attempts",
+    "tickets reassign",
+    "staff get",
+    "staff delete",
+    "webhooks update",
+    "settlements get",
+    "content-posts create",
+    "workspace create",
+    "signup",
+    "admin workspaces delete",
+    "admin workspaces plan-show",
+  ];
+  expect(expected.filter((p) => !tree.has(p))).toEqual([]);
+  const longs = (p: string) => tree.get(p)?.options.map((o) => o.long) ?? [];
+  for (const p of ["events cancel", "staff delete", "admin workspaces delete"])
+    expect(longs(p)).toContain("--yes");
+  // `plan <id>` (assign) must survive next to the new read.
+  expect(longs("admin workspaces plan")).toContain("--data");
+});

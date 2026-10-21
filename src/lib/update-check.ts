@@ -9,7 +9,8 @@ const ONE_DAY = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT = 1500;
 
 /**
- * Soft update notice. Prints to *stderr* when a newer @freeticket/cli is on npm,
+ * Soft update notice. Resolves to the text to print on *stderr* when a newer
+ * @freeticket/cli is on npm (the caller prints it after the command's output),
  * so `--json` on stdout stays clean and pipelines are never touched. The npm
  * registry is hit at most once a day (cached in ~/.freeticket); every other run
  * reads the cache and is instant. Best-effort: any failure is swallowed.
@@ -21,35 +22,54 @@ const FETCH_TIMEOUT = 1500;
  * (breaking contract), add a min-version gate here that reads a required version
  * and calls fail() instead of just warning.
  */
-export async function notifyUpdate(current: string): Promise<void> {
-  if (
-    !process.stderr.isTTY ||
-    process.env.FT_NO_UPDATE_CHECK ||
-    process.env.CI
-  ) {
-    return;
-  }
+export async function checkForUpdate(
+  current: string,
+  argv: string[] = process.argv,
+): Promise<string | null> {
+  if (updateCheckDisabled(argv, process.env, Boolean(process.stderr.isTTY)))
+    return null;
   try {
     const latest = await getLatest();
     if (latest && isNewer(latest, current)) {
-      process.stderr.write(
+      return (
         `\n${chalk.yellow(`⚠ Update available: @freeticket/cli ${current} → ${latest}`)}\n` +
-          `${chalk.dim("  npm i -g @freeticket/cli@latest  ·  or use  npx @freeticket/cli@latest")}\n\n`,
+        `${chalk.dim("  npm i -g @freeticket/cli@latest  ·  or use  npx @freeticket/cli@latest")}\n\n`
       );
     }
   } catch {
     // ponytail: the update check must never break a command. Ignore everything.
   }
+  return null;
+}
+
+/**
+ * No notice without a terminal, in CI, with FT_NO_UPDATE_CHECK, or when the
+ * output is meant for a machine (--json / --raw / --csv): an agent parsing the
+ * run gets nothing it did not ask for, not even on stderr.
+ */
+export function updateCheckDisabled(
+  argv: string[],
+  env: NodeJS.ProcessEnv,
+  isTTY: boolean,
+): boolean {
+  if (!isTTY || env.FT_NO_UPDATE_CHECK || env.CI) return true;
+  return argv.some((a) => a === "--json" || a === "--raw" || a === "--csv");
 }
 
 /** Latest version from cache (fresh ≤ 1 day) or the npm registry. */
 async function getLatest(): Promise<string | null> {
   const cached = readCache();
-  if (cached && Date.now() - cached.at < ONE_DAY) return cached.latest;
+  const now = Date.now();
+  // A timestamp in the future (clock skew, hand-edited file) is stale, not
+  // fresh forever: `now - at` would stay negative and never reach ONE_DAY.
+  if (cached && cached.at <= now && now - cached.at < ONE_DAY)
+    return cached.latest;
 
   const res = await fetch(REGISTRY, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT),
-    headers: { Accept: "application/vnd.npm.install-v1+json" },
+    // Not the abbreviated `application/vnd.npm.install-v1+json`: the
+    // `/latest` endpoint answers that with 406, so the notice never fired.
+    headers: { Accept: "application/json" },
   });
   if (!res.ok) throw new Error(`registry ${res.status}`);
   const latest = ((await res.json()) as { version?: string }).version ?? null;

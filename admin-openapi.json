@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket Admin API",
-    "version": "1.3.0",
+    "version": "1.5.0",
     "description": "API REST de superadmin de FreeTicket (cross-tenant). Autenticación por sesión de plataforma (staff con rol SUPER_ADMIN) o por service token (PAT) vía `Authorization: Bearer <token>` — NO usa API key de tenant. Aislada del contrato B2B /api/v1."
   },
   "servers": [
@@ -49,7 +49,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -59,7 +59,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -69,7 +69,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -79,7 +79,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -175,7 +175,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -185,7 +185,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -195,7 +195,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -205,7 +205,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -258,7 +258,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -268,7 +268,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -278,7 +278,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -288,7 +288,7 @@
             }
           },
           "409": {
-            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -298,7 +298,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -353,7 +353,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -363,7 +363,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -373,7 +373,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -383,7 +383,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -446,7 +446,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -456,7 +456,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -466,7 +466,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -476,7 +476,7 @@
             }
           },
           "409": {
-            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -486,7 +486,100 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWorkspacesId",
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Dar de baja un tenant (soft delete)",
+        "description": "Requiere sesión de plataforma con rol `SUPER_ADMIN`. Puebla `deletedAt`; NUNCA borra la fila ni datos relacionados (ventas, compradores, tickets) — la trazabilidad de facturación electrónica exige conservarlos. Requiere que el tenant esté YA suspendido (`POST /workspaces/{id}/suspend`) y que no tenga ninguna venta `CONFIRMED` (409 en ambos casos, sin override). Es idempotente: repetir la baja sobre un tenant ya borrado devuelve su estado actual sin re-evaluar esos guards. FUERA DE ALCANCE: no cancela suscripciones de Stripe, no borra ni anonimiza datos de compradores, y no es una baja de cumplimiento (GDPR/derecho al olvido) — eso requiere una superficie propia.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminWorkspace"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -499,6 +592,89 @@
       }
     },
     "/workspaces/{id}/plan": {
+      "get": {
+        "operationId": "getWorkspacesIdPlan",
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Plan y suscripción vigentes del tenant",
+        "description": "Requiere sesión de plataforma con rol `SUPER_ADMIN`. El plan se hereda de la Organization (umbrella) del workspace, no vive suelto en él: `orgId` indica bajo qué organización vive la suscripción. `planSlug`/`planName` son `null` cuando el tenant nunca contrató o quedó sin plan. `stripeLinked` es la señal que falta antes de reasignar: si es `true`, `POST /workspaces/{id}/plan` cancela ESA suscripción de Stripe antes de aplicar el plan nuevo.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminWorkspacePlanDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "postWorkspacesIdPlan",
         "tags": [
@@ -551,7 +727,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -561,7 +737,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -571,7 +747,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -581,7 +757,7 @@
             }
           },
           "409": {
-            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -591,7 +767,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -646,7 +822,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -656,7 +832,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -666,7 +842,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -676,7 +852,7 @@
             }
           },
           "409": {
-            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -686,7 +862,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -741,7 +917,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -751,7 +927,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -761,7 +937,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -771,7 +947,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -877,7 +1053,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -887,7 +1063,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -897,7 +1073,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -907,7 +1083,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -962,7 +1138,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -972,7 +1148,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -982,7 +1158,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -992,7 +1168,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1055,7 +1231,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1065,7 +1241,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1075,7 +1251,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1085,7 +1261,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1140,7 +1316,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1150,7 +1326,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1160,7 +1336,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1170,7 +1346,7 @@
             }
           },
           "409": {
-            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1180,7 +1356,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1217,7 +1393,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1227,7 +1403,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1237,7 +1413,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1247,7 +1423,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1295,7 +1471,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1305,7 +1481,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1315,7 +1491,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1325,7 +1501,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1378,7 +1554,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1388,7 +1564,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1398,7 +1574,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1408,7 +1584,7 @@
             }
           },
           "409": {
-            "description": "Conflicto: el recurso no admite la operación en su estado actual.",
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1418,7 +1594,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1473,7 +1649,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1483,7 +1659,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1493,7 +1669,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1503,7 +1679,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1566,7 +1742,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1576,7 +1752,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1586,7 +1762,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1596,7 +1772,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1677,7 +1853,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1687,7 +1863,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1697,7 +1873,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1707,7 +1883,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1726,7 +1902,7 @@
           "feature-flags"
         ],
         "summary": "Setear un feature flag por scope",
-        "description": "Requiere sesión de plataforma con rol `SUPER_ADMIN`.",
+        "description": "Upsert idempotente por (key, scope, scopeId). Con scope=workspace, un scopeId que no corresponde a un workspace existente responde 422 y no escribe nada.",
         "security": [
           {
             "session": []
@@ -1772,7 +1948,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1782,7 +1958,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1792,7 +1968,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1802,7 +1978,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1916,7 +2092,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1926,7 +2102,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1936,7 +2112,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1946,7 +2122,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1994,7 +2170,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2004,7 +2180,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2014,7 +2190,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2024,7 +2200,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2077,7 +2253,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2087,7 +2263,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2097,7 +2273,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2107,7 +2283,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2162,7 +2338,7 @@
             }
           },
           "401": {
-            "description": "Credencial inválida o ausente.",
+            "description": "Missing or invalid credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2172,7 +2348,7 @@
             }
           },
           "403": {
-            "description": "Rol insuficiente o recurso no accesible.",
+            "description": "Insufficient role or resource not accessible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2182,7 +2358,7 @@
             }
           },
           "404": {
-            "description": "Recurso inexistente o fuera de alcance.",
+            "description": "Resource does not exist or is out of scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2192,7 +2368,7 @@
             }
           },
           "422": {
-            "description": "Validación del cuerpo/parámetros.",
+            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2219,11 +2395,15 @@
               "message": {
                 "type": "string"
               },
+              "retryable": {
+                "type": "boolean"
+              },
               "details": {}
             },
             "required": [
               "code",
-              "message"
+              "message",
+              "retryable"
             ],
             "additionalProperties": false
           }
@@ -2542,6 +2722,116 @@
           "planSlug",
           "planName",
           "previousPlanSlug"
+        ],
+        "additionalProperties": false
+      },
+      "AdminWorkspacePlanDetail": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "orgId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "planSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "planName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "TRIALING",
+                  "ACTIVE",
+                  "PAST_DUE",
+                  "CANCELLED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stripeLinked": {
+            "type": "boolean"
+          },
+          "paymentOption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "workspaceId",
+          "orgId",
+          "planSlug",
+          "planName",
+          "status",
+          "startedAt",
+          "expiresAt",
+          "cancelledAt",
+          "stripeLinked",
+          "paymentOption"
         ],
         "additionalProperties": false
       },
