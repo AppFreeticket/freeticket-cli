@@ -161,7 +161,7 @@ ft admin crm events dates <eventId...>
 ft admin crm options
 ft admin crm quota
 ft admin crm preview --filter @filter.json [--sender freeticket|<workspaceId>]
-ft admin crm launch --data @campaign.json [--yes]
+ft admin crm launch --data @campaign.json [--ignore-window] [--yes]
 ```
 
 **Writes send real messages.** `launch`, `campaigns cancel`, `batches next` and
@@ -175,9 +175,11 @@ the same channel + sender + subject within 10 minutes with
 `DUPLICATE_CAMPAIGN` and prints the existing id).
 
 Named errors get a next step: `OUTSIDE_SEND_WINDOW` (WhatsApp sends only
-9:00-20:00 Bogotá) prints when the window opens and suggests `--ignore-window`;
+9:00-20:00 Bogotá) prints when the window opens and suggests `--ignore-window` (on `batches next`, and on a
+`launch` by WhatsApp with `timing.mode` `now`);
 `QUOTA_EXHAUSTED` prints when the quota frees up; `INVALID_STATE` means the
-campaign no longer allows that action; a 422 lists each `details[].path`.
+campaign no longer allows that action; a 422 lists each `details[].path`; a 413 `PAYLOAD_TOO_LARGE` means the body is over
+256 KB.
 
 Find the ids for a filter with `events search` and `events dates`, and the
 cities, genre/format codes, plans and WhatsApp templates with `options`.
@@ -237,6 +239,9 @@ cities, genre/format codes, plans and WhatsApp templates with `options`.
   organizations or events of more than one owner (`preview` tells you).
 - WhatsApp needs an approved `templateName` (see `options`); email rejects one.
   `imageUrl` for WhatsApp must come from the media library.
+- `ignoreSendWindow` (or `--ignore-window`): WhatsApp with `timing.mode` `now`
+  only; sends even outside 9:00-20:00 Bogotá instead of failing with
+  `OUTSIDE_SEND_WINDOW`.
 - `timing`: `{ "mode": "now" }` (sends on response), `{ "mode": "scheduled", "at": "<ISO with offset>" }`
   or `batches` (WhatsApp only, daily cap 150 when FreeTicket signs, 200 for an
   organization). WhatsApp times are moved into the 9:00-20:00 Bogotá window;

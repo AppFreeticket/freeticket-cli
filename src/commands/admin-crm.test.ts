@@ -117,9 +117,8 @@ describe("ft admin crm command tree", () => {
       ["batches", "stop"],
     ])
       expect(find(p).options.map((o) => o.long)).toContain("--yes");
-    expect(find(["batches", "next"]).options.map((o) => o.long)).toContain(
-      "--ignore-window",
-    );
+    for (const p of [["batches", "next"], ["launch"]])
+      expect(find(p).options.map((o) => o.long)).toContain("--ignore-window");
   });
 });
 
@@ -300,6 +299,99 @@ describe("ft admin crm commands", () => {
     const err = stderr.join("\n");
     expect(err).toContain("[DUPLICATE_CAMPAIGN]");
     expect(err).toContain("ft admin crm campaigns get cmp_old");
+  });
+
+  const nowInput = {
+    channel: "WHATSAPP",
+    sender: { kind: "freeticket" },
+    templateName: "promo",
+    subject: "Hello",
+    body: "Hi",
+    filter: { version: 2, include: [], except: [] },
+    timing: { mode: "now" },
+  };
+
+  it("launch --ignore-window sends ignoreSendWindow in the body", async () => {
+    sdk.postCrmAudiencePreview.mockResolvedValue(ok(PREVIEW));
+    sdk.postCrmCampaigns.mockResolvedValue(
+      ok({ id: "cmp_9", status: "APPROVED", scheduledAt: null }),
+    );
+    await run(
+      "launch",
+      "--data",
+      JSON.stringify(nowInput),
+      "--ignore-window",
+      "--yes",
+      "--json",
+    );
+    expect(sdk.postCrmCampaigns).toHaveBeenCalledWith({
+      body: { ...nowInput, ignoreSendWindow: true },
+    });
+  });
+
+  it("launch without the flag does not add ignoreSendWindow", async () => {
+    sdk.postCrmAudiencePreview.mockResolvedValue(ok(PREVIEW));
+    sdk.postCrmCampaigns.mockResolvedValue(
+      ok({ id: "cmp_9", status: "APPROVED", scheduledAt: null }),
+    );
+    await run("launch", "--data", JSON.stringify(nowInput), "--yes", "--json");
+    expect(sdk.postCrmCampaigns.mock.calls[0]?.[0].body).not.toHaveProperty(
+      "ignoreSendWindow",
+    );
+  });
+
+  it("launch on OUTSIDE_SEND_WINDOW says when it opens and suggests --ignore-window, once", async () => {
+    sdk.postCrmAudiencePreview.mockResolvedValue(ok(PREVIEW));
+    sdk.postCrmCampaigns.mockResolvedValue(
+      apiError(
+        409,
+        {
+          code: "OUTSIDE_SEND_WINDOW",
+          message: "Fuera de la ventana de envío.",
+          retryable: true,
+        },
+        { "Retry-After": "5400" },
+      ),
+    );
+    await expect(
+      run("launch", "--data", JSON.stringify(nowInput), "--yes"),
+    ).rejects.toThrow("exited");
+    expect(sdk.postCrmCampaigns).toHaveBeenCalledTimes(1);
+    const err = stderr.join("\n");
+    expect(err).toContain("[OUTSIDE_SEND_WINDOW]");
+    expect(err).toContain("in 1h 30m");
+    expect(err).toContain("--ignore-window");
+  });
+
+  it("413 PAYLOAD_TOO_LARGE with the envelope explains the limit", async () => {
+    sdk.postCrmAudiencePreview.mockResolvedValue(
+      apiError(413, {
+        code: "PAYLOAD_TOO_LARGE",
+        message: "El cuerpo supera el máximo de 256 KB.",
+      }),
+    );
+    await expect(run("preview", "--filter", '{"version":2}')).rejects.toThrow(
+      "exited",
+    );
+    const err = stderr.join("\n");
+    expect(err).toContain("Error 413 [PAYLOAD_TOO_LARGE]");
+    expect(err).toContain("256 KB");
+  });
+
+  it("413 without a JSON body (proxy) still reads as PAYLOAD_TOO_LARGE", async () => {
+    sdk.postCrmAudiencePreview.mockResolvedValue(ok(PREVIEW));
+    sdk.postCrmCampaigns.mockResolvedValue({
+      data: undefined,
+      error: "Request Entity Too Large",
+      response: new Response(null, { status: 413 }),
+    });
+    await expect(
+      run("launch", "--data", JSON.stringify(nowInput), "--yes"),
+    ).rejects.toThrow("exited");
+    expect(exit).toHaveBeenCalledWith(1);
+    const err = stderr.join("\n");
+    expect(err).toContain("[PAYLOAD_TOO_LARGE]");
+    expect(err).toContain("Trim the JSON");
   });
 
   it("batches next --ignore-window sends ignoreSendWindow", async () => {
