@@ -123,6 +123,7 @@ ft sales list --status CONFIRMED --json
 | `ft content-videos list` · `content-posts list\|create` · `content-lives list\|get\|playback-token` | Organization content; `content-posts create --data` publishes a post or article | ADMIN |
 | `ft api-keys create <name>` · `list` · `revoke <id>` | Self-service API keys (the secret is shown once, never stored) | ADMIN |
 | `ft admin login` · `me` · `workspaces` · `users` · `plans` · `feature-flags` · `tokens` · `audit-log` | Superadmin, cross-tenant — needs a SUPER_ADMIN session, not an API key. Includes `admin workspaces plan <id>` (assisted plan assignment), `plan-show <id>` (current plan) and `delete <id>` (soft delete; suspend first) and `webTemplate` / `customDomain` on `update` | SUPER_ADMIN |
+| `ft admin crm campaigns` · `batches` · `events` · `options` · `quota` · `preview` · `launch` | Master CRM: email / WhatsApp campaigns to buyers across workspaces. See [`ft admin crm`](#ft-admin-crm) | SUPER_ADMIN |
 
 > **Write operations** (`create`/`update`/`delete` and actions like `publish`,
 > `cancel`, `refund`) send a JSON body via `--data <inline-json>` or
@@ -142,6 +143,110 @@ ft sales list --status CONFIRMED --json
 | `--csv` | list commands | CSV output for spreadsheets/accounting |
 | `--data <json>` `--yes` | write commands | JSON body (inline or `@file`) · skip delete confirmation |
 
+## `ft admin crm`
+
+The master CRM for the internal team: email and WhatsApp campaigns to buyers,
+across every workspace, against `/api/admin/crm`. It needs a SUPER_ADMIN
+credential — `FT_ADMIN_TOKEN` (a service token from `ft admin tokens create`)
+or `ft admin login --session`.
+
+```bash
+ft admin crm campaigns list [--channel EMAIL|WHATSAPP] [--status S] [--limit N]
+ft admin crm campaigns get <id>
+ft admin crm campaigns cancel <id> [--yes]
+ft admin crm batches next <id> [--ignore-window] [--yes]
+ft admin crm batches stop <id> [--yes]
+ft admin crm events search <query> [--purpose scope|promote|except] [--sender <workspaceId>]
+ft admin crm events dates <eventId...>
+ft admin crm options
+ft admin crm quota
+ft admin crm preview --filter @filter.json [--sender freeticket|<workspaceId>]
+ft admin crm launch --data @campaign.json [--ignore-window] [--yes]
+```
+
+**Writes send real messages.** `launch`, `campaigns cancel`, `batches next` and
+`batches stop` first show what they are about to touch — `launch` runs the
+audience preview with the same filter and sender (total, how many have email
+or reachable WhatsApp, the estimated days at the daily quota); the others show
+the campaign — and then ask for confirmation. Without a TTY they refuse unless
+you pass `--yes`. The CLI never retries a write on its own: if a `launch`
+times out, check `campaigns list` before launching again (the backend rejects
+the same channel + sender + subject within 10 minutes with
+`DUPLICATE_CAMPAIGN` and prints the existing id).
+
+Named errors get a next step: `OUTSIDE_SEND_WINDOW` (WhatsApp sends only
+9:00-20:00 Bogotá) prints when the window opens and suggests `--ignore-window` (on `batches next`, and on a
+`launch` by WhatsApp with `timing.mode` `now`);
+`QUOTA_EXHAUSTED` prints when the quota frees up; `INVALID_STATE` means the
+campaign no longer allows that action; a 422 lists each `details[].path`; a 413 `PAYLOAD_TOO_LARGE` means the body is over
+256 KB.
+
+Find the ids for a filter with `events search` and `events dates`, and the
+cities, genre/format codes, plans and WhatsApp templates with `options`.
+
+### `filter.json` (audience filter v2)
+
+```json
+{
+  "version": 2,
+  "scope": { "level": "platform" },
+  "include": [
+    { "type": "purchased", "eventIds": ["evt_123"], "window": { "kind": "last_days", "days": 90 } }
+  ],
+  "except": [
+    { "type": "received_campaign", "days": 7, "channel": "any" }
+  ]
+}
+```
+
+- `scope` (default `platform`): `{ "level": "orgs", "workspaceIds": [...] }` or
+  `{ "level": "events", "eventIds": [...] }`.
+- `include` conditions combine with AND; `except` with OR, evaluated across the
+  whole platform. Up to 12 per block, 50 ids per list.
+- Condition types: `purchased`, `abandoned`, `checked_in` (with optional
+  `eventIds`, `dateIds` + `dateEventIds`, `window`), `city` (`cities`),
+  `facet` (`dimension`: `genre` | `format`, `codes`), `membership` (`state`:
+  `active` | `expiring` | `cancelled`, `withinDays` for `expiring`, `planIds`),
+  `spend` (`minCop`, `maxCop`), `received_campaign` (`except` only: `days`,
+  `channel`), `people` (`include` only: `emails`).
+- `window`: `{ "kind": "any" }` (default), `{ "kind": "last_days", "days": 7|30|90 }`
+  or `{ "kind": "range", "from": "2026-09-01", "to": "2026-09-30" }` (Bogotá dates).
+- Without a state condition (`purchased`, `abandoned`, `checked_in`,
+  `membership`, `people`) in `include`, the audience defaults to confirmed
+  buyers plus active members.
+
+### `campaign.json`
+
+```json
+{
+  "channel": "WHATSAPP",
+  "sender": { "kind": "freeticket" },
+  "templateName": "promo_show",
+  "subject": "New date in Medellín",
+  "body": "We just opened a second show. Get your tickets before they are gone.",
+  "promotedEventId": "evt_123",
+  "filter": {
+    "version": 2,
+    "include": [{ "type": "purchased", "eventIds": ["evt_123"] }],
+    "except": []
+  },
+  "timing": { "mode": "batches", "firstAt": "2026-11-03T10:00:00-05:00", "batchSize": 50, "perDay": 3, "intervalMinutes": 120 }
+}
+```
+
+- `sender`: `{ "kind": "freeticket" }` or `{ "kind": "organization", "workspaceId": "..." }`.
+  FreeTicket is mandatory when the scope spans the platform, several
+  organizations or events of more than one owner (`preview` tells you).
+- WhatsApp needs an approved `templateName` (see `options`); email rejects one.
+  `imageUrl` for WhatsApp must come from the media library.
+- `ignoreSendWindow` (or `--ignore-window`): WhatsApp with `timing.mode` `now`
+  only; sends even outside 9:00-20:00 Bogotá instead of failing with
+  `OUTSIDE_SEND_WINDOW`.
+- `timing`: `{ "mode": "now" }` (sends on response), `{ "mode": "scheduled", "at": "<ISO with offset>" }`
+  or `batches` (WhatsApp only, daily cap 150 when FreeTicket signs, 200 for an
+  organization). WhatsApp times are moved into the 9:00-20:00 Bogotá window;
+  the response's `scheduledAt` is the real one.
+
 ## Configuration
 
 `ft` resolves configuration in this precedence order:
@@ -155,6 +260,8 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL (without `/api/v1`) |
 | `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key. When set it is the **only** account: stored logins are ignored, nothing fans out across them, and `--account` is rejected. A workspace pinned with `ft workspace use` still applies |
 | `FT_WORKSPACE_ID` | *home* | Default active workspace |
+| `FT_ADMIN_TOKEN` | — | `ft admin` only — a platform service token (`ft admin tokens create`), sent as `Authorization: Bearer`. Takes precedence over the session cookie |
+| `FT_ADMIN_SESSION` | — | `ft admin` only — a SUPER_ADMIN `better-auth.session_token` cookie (same as `ft admin login --session`) |
 | `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice (checked at most once a day; also off in CI, without a TTY, and with `--json`/`--raw`/`--csv`) |
 
 Logins are stored per account under `accounts` in `~/.freeticket/config.json`
