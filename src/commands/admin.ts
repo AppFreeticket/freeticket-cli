@@ -32,6 +32,7 @@ import { configureAdminClient, unwrap } from "../lib/api";
 import { CONFIG_PATH, loadConfig, saveConfig } from "../lib/config";
 import { confirmOrExit, parseData } from "../lib/input";
 import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
+import { registerAdminCrm } from "./admin-crm";
 
 type SdkFn = (
   opts: any,
@@ -298,6 +299,8 @@ export function registerAdmin(program: Command): void {
   ];
 
   for (const spec of resources) registerAdminResource(admin, spec);
+
+  registerAdminCrm(admin);
 }
 
 function registerAdminResource(parent: Command, spec: AdminResource): void {
