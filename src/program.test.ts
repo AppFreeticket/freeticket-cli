@@ -55,3 +55,21 @@ test("contract 1.24: waitlist list/create are wired, list filters by --city", ()
   expect(longs).toContain("--city");
   expect(longs).toContain("--account");
 });
+
+test("admin 1.7 CRM commands are wired under `ft admin crm`", () => {
+  const tree = new Map(walk(program));
+  const expected = [
+    "admin crm campaigns list",
+    "admin crm campaigns get",
+    "admin crm campaigns cancel",
+    "admin crm batches next",
+    "admin crm batches stop",
+    "admin crm events search",
+    "admin crm events dates",
+    "admin crm options",
+    "admin crm quota",
+    "admin crm preview",
+    "admin crm launch",
+  ];
+  expect(expected.filter((p) => !tree.has(p))).toEqual([]);
+});

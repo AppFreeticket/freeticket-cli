@@ -154,7 +154,9 @@ export function unwrap<T>(res: {
     const lines = [
       `Error ${status ?? ""} [${err.code ?? "?"}]: ${err.message ?? "unknown failure"}`.trim(),
     ];
-    for (const d of err.details ?? [])
+    // `details` is a list of field errors on a 422, but an object elsewhere
+    // (e.g. `{ existingId }` on a duplicate): only the list is printable.
+    for (const d of Array.isArray(err.details) ? err.details : [])
       lines.push(`  · ${d.path ?? ""}: ${d.message ?? ""}`.trimEnd());
     fail(lines.join("\n"), hintFor(status));
   }
