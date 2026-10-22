@@ -155,6 +155,8 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL (without `/api/v1`) |
 | `FT_API_KEY` | — | CI/headless only — a backend-issued `ft_live_...` token. Browser login (`ft login`) needs no key. When set it is the **only** account: stored logins are ignored, nothing fans out across them, and `--account` is rejected. A workspace pinned with `ft workspace use` still applies |
 | `FT_WORKSPACE_ID` | *home* | Default active workspace |
+| `FT_ADMIN_TOKEN` | — | `ft admin` only — a platform service token (`ft admin tokens create`), sent as `Authorization: Bearer`. Takes precedence over the session cookie |
+| `FT_ADMIN_SESSION` | — | `ft admin` only — a SUPER_ADMIN `better-auth.session_token` cookie (same as `ft admin login --session`) |
 | `FT_NO_UPDATE_CHECK` | — | Set to disable the "update available" notice (checked at most once a day; also off in CI, without a TTY, and with `--json`/`--raw`/`--csv`) |
 
 Logins are stored per account under `accounts` in `~/.freeticket/config.json`
