@@ -112,6 +112,9 @@ export function describeWhen(seconds: number, now = Date.now()): string {
   return `${local} (Bogotá), in ${rel} — ${at.toISOString()}`;
 }
 
+const PAYLOAD_HINT =
+  "The request body is over the backend limit (256 KB). Trim the JSON: long `people` email lists, a huge `body`, or ids that could be a scope instead.";
+
 /**
  * The error message + next step for the CRM's named errors. `null` when the
  * code is not one of them (the generic `unwrap` handles it).
@@ -126,7 +129,7 @@ export function crmErrorHint(
         retryAfter !== undefined
           ? `The WhatsApp send window (9:00-20:00 Bogotá) opens ${describeWhen(retryAfter)}.`
           : "The WhatsApp send window (9:00-20:00 Bogotá) is closed.",
-        "Retry then, or pass --ignore-window to send this batch now.",
+        "Retry then, or pass --ignore-window to send now.",
       ].join("\n");
     case "DUPLICATE_CAMPAIGN": {
       const id = (err.details as { existingId?: string } | undefined)
@@ -145,6 +148,8 @@ export function crmErrorHint(
       return "The filter matches nobody. Adjust it and check with `ft admin crm preview`.";
     case "WHATSAPP_BLOCKED":
       return "WhatsApp sending is blocked for this template or sender. See `whatsappBlockedReason` in `ft admin crm options`.";
+    case "PAYLOAD_TOO_LARGE":
+      return PAYLOAD_HINT;
     case "WHATSAPP_UNAVAILABLE":
       return "The WhatsApp provider did not answer. Safe to retry by hand in a moment - the CLI never retries a write on its own.";
     default:
@@ -159,8 +164,13 @@ export function crmErrorHint(
 function crmUnwrap<T>(res: SdkResult<T>): T {
   if (res.data !== undefined) return res.data;
   const err = (res.error as { error?: CrmError } | undefined)?.error;
-  if (!err) return unwrap(res);
   const status = res.response?.status;
+  if (!err && status === 413)
+    fail(
+      "Error 413 [PAYLOAD_TOO_LARGE]: request body too large.",
+      PAYLOAD_HINT,
+    );
+  if (!err) return unwrap(res);
   const lines = [
     `Error ${status ?? ""} [${err.code ?? "?"}]: ${err.message ?? "unknown failure"}`,
   ];
@@ -482,11 +492,18 @@ export function registerAdminCrm(admin: Command): void {
       "--data <json>",
       "campaign JSON: channel, sender, subject, body, filter, timing (inline or @campaign.json)",
     )
+    .option(
+      "--ignore-window",
+      "WhatsApp with timing.mode now: send even outside the 9:00-20:00 Bogotá window",
+    )
     .option("--yes", "skip confirmation")
     .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureAdminClient();
       const input = parseData(opts.data) as AdminCrmLaunchInput;
+      // The flag wins over the file, so the confirmation below tells the truth.
+      if (opts.ignoreWindow && input && typeof input === "object")
+        input.ignoreSendWindow = true;
       if (!input || typeof input !== "object" || !input.filter)
         fail(
           "--data needs a `filter` (and channel, sender, subject, body, timing).",
@@ -521,7 +538,7 @@ export function registerAdminCrm(admin: Command): void {
             ? "in batches"
             : "on schedule";
       await confirmOrExit(
-        `Launch to ${reach} people by ${input.channel ?? "?"}, sending ${when}?`,
+        `Launch to ${reach} people by ${input.channel ?? "?"}, sending ${when}${input.ignoreSendWindow ? " (ignoring the send window)" : ""}?`,
         opts.yes,
       );
       const body = crmUnwrap(await postCrmCampaigns({ body: input }));
