@@ -11,7 +11,7 @@ import {
   tagRow,
   unwrap,
 } from "../lib/api";
-import { confirmOrExit, parseData } from "../lib/input";
+import { confirmOrExit, parseData, parseLimit } from "../lib/input";
 import {
   print,
   printEmptyScope,
@@ -91,8 +91,9 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
     for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
     cmd.action(async (opts) => {
       let columns = resolveColumns(opts, spec.columns);
+      opts.limit = parseLimit(opts.limit);
       const query: Record<string, unknown> = {
-        limit: Number(opts.limit),
+        limit: opts.limit,
         cursor: opts.cursor,
       };
       for (const f of spec.listFlags ?? []) {
