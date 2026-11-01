@@ -64,6 +64,7 @@ import { registerAdmin } from "./commands/admin";
 import { registerApiKeys } from "./commands/api-keys";
 import { registerAuth } from "./commands/auth";
 import { registerEventDates } from "./commands/event-dates";
+import { registerArtists, registerEventLineup } from "./commands/lineup";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
@@ -130,7 +131,10 @@ registerResource(program, {
       query: "withTotal",
     },
   ],
+  extend: registerEventLineup,
 });
+
+registerArtists(program);
 
 // Read-only: settlements are created by FreeTicket, never by the organizer.
 // The PDF and the payment proofs download through `ft settlements document`

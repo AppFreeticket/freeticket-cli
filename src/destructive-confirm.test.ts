@@ -17,12 +17,17 @@ const sdk = vi.hoisted(() => ({
   postEventsIdCancel: vi.fn(),
   deleteStaffId: vi.fn(),
   deleteWorkspacesId: vi.fn(),
+  deleteEventsIdArtistsOrganizationId: vi.fn(),
+  deleteEventsIdArtistInvitationsInvitationId: vi.fn(),
 }));
 
 vi.mock("./client/sdk.gen", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./client/sdk.gen")>()),
   postEventsIdCancel: sdk.postEventsIdCancel,
   deleteStaffId: sdk.deleteStaffId,
+  deleteEventsIdArtistsOrganizationId: sdk.deleteEventsIdArtistsOrganizationId,
+  deleteEventsIdArtistInvitationsInvitationId:
+    sdk.deleteEventsIdArtistInvitationsInvitationId,
 }));
 
 vi.mock("./admin-client/sdk.gen", async (importOriginal) => ({
@@ -61,6 +66,14 @@ describe("destructive commands refuse without a TTY and without --yes", () => {
     [["events", "cancel", "evt_1"], sdk.postEventsIdCancel],
     [["staff", "delete", "stf_1"], sdk.deleteStaffId],
     [["admin", "workspaces", "delete", "ws_1"], sdk.deleteWorkspacesId],
+    [
+      ["events", "artists", "remove", "evt_1", "org_1"],
+      sdk.deleteEventsIdArtistsOrganizationId,
+    ],
+    [
+      ["events", "invitations", "cancel", "evt_1", "inv_1"],
+      sdk.deleteEventsIdArtistInvitationsInvitationId,
+    ],
   ])("ft %j exits 1 and never calls the SDK", async (args, fn) => {
     await expect(
       program.parseAsync(["node", "ft", ...(args as string[])]),

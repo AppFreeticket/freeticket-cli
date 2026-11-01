@@ -95,6 +95,10 @@ ft sales list --status CONFIRMED --json
 | `ft events list` · `get <id>` | Workspace events (`--q` `--status` `--with-total`) | VIEWER |
 | `ft events create` · `update <id>` · `delete <id>` | Manage events (`--data <json>`) | ADMIN |
 | `ft events publish <id>` · `cancel <id>` | Publish an event · cancel it and all its dates, keeping sales and tickets (no refunds; `--yes` skips the prompt) | ADMIN |
+| `ft artists search <q>` | Find registered artists by name to get the ids a lineup takes (`--limit` `--cursor`) | VIEWER |
+| `ft events artists set <eventId> --artist <id>... [--invite <email>...]` | Replace the lineup, in order (unlisted artists are unlinked; asks before removing anyone, `--yes` skips it; ignored ids are shown as `ARTIST_IDS_IGNORED`) | ADMIN |
+| `ft events artists remove <eventId> <organizationId>` | Unlink one artist (`--yes` skips the prompt) | ADMIN |
+| `ft events invitations list <eventId>` · `resend <eventId> <invitationId>` · `cancel <eventId> <invitationId>` | Invitations sent to artists without an account: list, resend (renews 14 days, sends an email) and cancel (`--yes`) | ADMIN |
 | `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
 | `ft ticket-types list` · `get <id>` | Ticket types (`--event-date-id`) | VIEWER |
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
