@@ -65,6 +65,13 @@ import { registerApiKeys } from "./commands/api-keys";
 import { registerAuth } from "./commands/auth";
 import { registerEventDates } from "./commands/event-dates";
 import { registerArtists, registerEventLineup } from "./commands/lineup";
+import {
+  registerCheckinUndo,
+  registerCourtesySeats,
+  registerEventSchedule,
+  registerPresaleWindows,
+  registerSaleOps,
+} from "./commands/ops";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
@@ -131,7 +138,10 @@ registerResource(program, {
       query: "withTotal",
     },
   ],
-  extend: registerEventLineup,
+  extend: (root) => {
+    registerEventLineup(root);
+    registerEventSchedule(root);
+  },
 });
 
 registerArtists(program);
@@ -246,6 +256,7 @@ registerResource(program, {
     },
     { flag: "--to <date>", describe: "created to (ISO 8601)", query: "to" },
   ],
+  extend: registerSaleOps,
 });
 
 registerResource(program, {
@@ -413,7 +424,14 @@ registerResource(program, {
   },
 });
 
+registerPresaleWindows(program);
+
 registerTickets(program);
+// Commands added to existing families (contract 1.25.0, see commands/ops.ts).
+const family = (name: string) =>
+  program.commands.find((c) => c.name() === name) as Command;
+registerCheckinUndo(family("tickets"));
+registerCourtesySeats(family("event-dates"));
 registerReports(program);
 registerApiKeys(program);
 registerAdmin(program);

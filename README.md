@@ -99,15 +99,21 @@ ft sales list --status CONFIRMED --json
 | `ft events artists set <eventId> --artist <id>... [--invite <email>...]` | Replace the lineup, in order (unlisted artists are unlinked; asks before removing anyone, `--yes` skips it; ignored ids are shown as `ARTIST_IDS_IGNORED`) | ADMIN |
 | `ft events artists remove <eventId> <organizationId>` | Unlink one artist (`--yes` skips the prompt) | ADMIN |
 | `ft events invitations list <eventId>` · `resend <eventId> <invitationId>` · `cancel <eventId> <invitationId>` | Invitations sent to artists without an account: list, resend (renews 14 days, sends an email) and cancel (`--yes`) | ADMIN |
+| `ft events schedule set <eventId> --publish-at <iso>` \| `--sale-starts-at <iso>` · `schedule clear <eventId>` | Schedule a DRAFT: publish later, or publish now and open sales later (exactly one flag) · cancel a pending `--publish-at` | ADMIN |
 | `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
+| `ft event-dates courtesy-seats <dateId>` | Blocked seats of a numbered date that can be issued as courtesies | ADMIN |
 | `ft ticket-types list` · `get <id>` | Ticket types (`--event-date-id`) | VIEWER |
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
+| `ft presale-windows list <ticketTypeId>` · `create <ticketTypeId> --plan --starts-at --ends-at [--capacity --active]` · `update <id>` · `delete <id>` | Membership presale windows (alias `presales`; one per plan; `delete` asks, `--yes` skips) | ADMIN |
 | `ft sales list` · `get <id>` | Sales (filters: `--status` `--channel` `--event` `--event-date` `--reference` `--buyer` `--from` `--to`) | STAFF |
 | `ft sales create` | Create a sale/order — comps & programmatic sales (`--data <json>`) | ADMIN |
 | `ft sales cancel <id>` · `refund <id>` | Cancel / refund a sale (`--data` for the `acknowledge_open_payment` / `acknowledge_manual` flags) | ADMIN |
 | `ft sales tickets <id>` · `attempts <id>` | Tickets/attendees of a sale · its payment attempt history (why it did not go through) | STAFF |
+| `ft sales transfer <saleId> <itemId> --email <email>` | Transfer one ticket to a registered buyer; voids the old QR, once per ticket (`--yes`) | ADMIN |
+| `ft sales recipient set <saleId> --name <name> --email <email>` | Correct a courtesy's recipient and resend (a new email voids the old QRs; `--yes`) | ADMIN |
 | `ft tickets access <code>` | Read a ticket's access status (no admit) | STAFF |
 | `ft tickets checkin <code>` | Admit a ticket at the door (idempotent) | STAFF |
+| `ft tickets checkin-undo <code>` | Undo a check-in so the ticket is valid again (idempotent; `--yes`) | ADMIN |
 | `ft tickets resend <code>` | Resend the ticket's confirmation email (QR) | ADMIN |
 | `ft tickets reassign <code>` | Move a sold ticket to another date and/or type (`--data '{"eventDateId":"…"}'`; no price difference charged/refunded) | ADMIN |
 | `ft plans list` · `get <id>` | Membership plans | VIEWER |
