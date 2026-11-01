@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0
+
+### Minor Changes
+
+- aae6701: Nuevo `ft waitlist list|create`: lista de espera por ciudad de las landings enterprise (contrato 1.24). `list` filtra con `--city`.
+
+### Patch Changes
+
+- 3210cb6: `--limit` en los comandos `list` ahora se valida (entero de 1 a 100) y falla con un mensaje claro, en vez de mandarse tal cual y volver en silencio con la página por defecto de 20.
+
 ## 0.11.1
 
 ### Patch Changes
