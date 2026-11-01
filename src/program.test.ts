@@ -46,3 +46,12 @@ test("contract 1.19 / admin 1.5 commands are wired, destructive ones behind --ye
   // `plan <id>` (assign) must survive next to the new read.
   expect(longs("admin workspaces plan")).toContain("--data");
 });
+
+test("contract 1.24: waitlist list/create are wired, list filters by --city", () => {
+  const tree = new Map(walk(program));
+  expect(tree.has("waitlist list")).toBe(true);
+  expect(tree.has("waitlist create")).toBe(true);
+  const longs = tree.get("waitlist list")?.options.map((o) => o.long) ?? [];
+  expect(longs).toContain("--city");
+  expect(longs).toContain("--account");
+});

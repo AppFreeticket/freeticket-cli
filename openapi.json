@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket B2B API",
-    "version": "1.20.0",
-    "description": "FreeTicket B2B REST API for integrations and the CLI. Authentication is by API key (`Authorization: Bearer <key>` header or `x-api-key`); the active workspace is selected with the `X-Workspace-Id` header.\n\nScopes: each key is either `read` (GET/HEAD only) or `write` (additionally creates, edits, deletes, cancels, refunds and checks in). Self-service keys are issued as `read`. A `read` key calling a mutating method gets a 403. The machine-readable declaration lives at `/.well-known/oauth-protected-resource` (RFC 9728)."
+    "version": "1.24.0",
+    "description": "FreeTicket B2B REST API for integrations, the `ft` CLI and the FreeTicket MCP server. Authentication is by API key (`Authorization: Bearer <key>` header or `x-api-key`); the active workspace is selected with the `X-Workspace-Id` header.\n\nScopes: each key is either `read` (GET/HEAD only) or `write` (additionally creates, edits, deletes, cancels, refunds and checks in). Self-service keys are issued as `read`. A `read` key calling a mutating method gets a 403. The machine-readable declaration lives at `/.well-known/oauth-protected-resource` (RFC 9728).\n\nGetting a key (self-serve, no sales contact): `ft login` runs the Device Authorization Grant (RFC 8628, `POST /auth/device/code` + `POST /auth/device/token`); the user approves the code at https://admin.appfreeticket.com/device and the CLI receives a key. New organizers can bootstrap headless with `POST /auth/signup` (verify-first, then `ft login`). With a key, `POST /api-keys` mints more (born `read` unless `write` is requested). There is no sandbox environment: test against a dedicated workspace with `read` keys.\n\n## Versioning and deprecation\n\n- **Path version.** The B2B API is versioned in the path (`/api/v1`). A breaking change ships under a new path (`/api/v2`); the previous version keeps running in parallel until its sunset date.\n- **Contract version.** `info.version` is the semantic version of this document. MINOR = additive (new endpoints, new optional fields, new enum values, new error codes; clients must ignore unknown fields). PATCH = documentation or fixes that do not change shapes. The public API (`/api/public`) is pre-1.0 and not versioned in the path: there, a MINOR bump may include a breaking change and PATCH never does.\n- **Deprecation signals.** A deprecated operation is marked `deprecated: true` in this document and its responses carry `Deprecation` (RFC 9745, e.g. `Deprecation: @1767225600`), `Sunset` (RFC 8594, an HTTP-date after which the operation may stop working) and `Link: <https://appfreeticket.com/desarrolladores>; rel=\"deprecation\"`.\n- **Timeline.** At least 6 months between the first `Deprecation` header and the `Sunset` date for `/api/v1`, and at least 90 days for `/api/public`. A path version is only retired after all its operations have sunset.\n- **Current status.** No operation is deprecated today.\n\n## Rate limits\n\n- **429 always carries `Retry-After`** (seconds). Wait at least that long before retrying the same request. The JSON error envelope comes with `error.retryable: true`; most rate-limited responses use `error.code: \"RATE_LIMITED\"`, and some return a more specific code (for example `TOO_MANY_REQUESTS` or `SEAT_BUDGET_EXHAUSTED`).\n- **RateLimit headers are sent where listed below.** Those endpoints answer every response, success or error, with the IETF RateLimit headers (draft-ietf-httpapi-ratelimit-headers): `RateLimit-Policy: \"<policy>\";q=<quota>;w=<window seconds>` and `RateLimit: \"<policy>\";r=<remaining>;t=<seconds until reset>`. Other endpoints may answer 429 without them.\n- Counters are fixed windows kept per server instance: treat the numbers as pacing hints, not as a global account quota.\n\nEndpoints that send RateLimit headers today: `POST /auth/signup` (per client IP), `POST /customer/auth/request` and `POST /customer/auth/verify` (per client IP), and the buyer-session endpoints `GET /customer/orders/{id}`, `POST /customer/orders/{id}/payment`, `/payment/card`, `/payment/pse`, `/release`, `POST /customer/purchase-sessions` and `POST /customer/purchase-sessions/{id}/release`."
   },
   "servers": [
     {
@@ -203,6 +203,613 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/orders": {
+      "get": {
+        "operationId": "getCustomerOrders",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "The purchase the buyer left unfinished for this event date",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL: with a key, results are additionally scoped to the workspace pinned to it; without a key, any of the buyer's own unfinished purchases is visible. Returns the PENDING sale whose inventory hold is STILL ALIVE that the buyer has for that event date —with its seats, its total and when it expires—, or `order: null` if there is none. This is what lets reloading the checkout, or coming back from signing in, RESUME the purchase instead of starting from scratch: the seats remain held in that person's name. If `paymentOpened` is true the payment is already open and `POST /customer/orders/{id}/payment` returns the SAME signed configuration; to discard it and pick other seats, use `POST /customer/orders/{id}/release`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eventDateId",
+            "in": "query",
+            "required": false,
+            "description": "Required. The event date being queried.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderCurrent"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postCustomerOrders",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "Create the ticket reservation (step 1 of the headless purchase)",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL: with a key, the date and the ticket type must belong to the workspace pinned to it (anything else is 404); without a key, it is enough for the ticket type to exist and be on sale (same eligibility as the first-party checkout). Reserves inventory and creates the PENDING sale with the SAME rules as the first-party checkout (stock under lock, seats validated against seats.io, per-buyer limit, presale, memberships and virtual queue turn). The buyer email comes from the session, never from the body. Rejections carry a stable `reason` in `error.details.reason` (`sold_out`, `queue_turn_required`, `seats_not_held`, `members_only`, `members_only_withdrawn` — a members-only ticket whose artist withdrew the permission or left the lineup: it is no longer sold even to members —, …). With `pending_sale_in_progress` the inventory is taken by a half-paid purchase FROM THE SAME buyer: `error.details.pendingSaleId` and `pendingReference` identify it, and the right step is to reopen its payment with `POST /customer/orders/{pendingSaleId}/payment` (idempotent) instead of reserving again. If `free` is true the sale is already confirmed and `/payment` must NOT be called. Next step: `POST /customer/orders/{id}/payment`.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Purchase-Session",
+            "in": "header",
+            "required": false,
+            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerOrderCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderCreateResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: an external dependency is down or initialization failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/purchase-sessions/{id}": {
+      "get": {
+        "operationId": "getCustomerPurchaseSessionsId",
+        "tags": [
+          "customer",
+          "purchase-sessions"
+        ],
+        "summary": "Purchase session status",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL. Returns the status of one of THE buyer's purchase sessions: `live` (this tab can create the order), `superseded` (another tab or device replaced it: stop offering the map and the payment), `expired` (the map clock ran out or it was released) or `converted` (it already created its order: `orderId`). A session whose `seatsDeadline` has passed is reported as `expired` immediately. Designed to be polled every ~10 s. Another buyer's session is 404.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PurchaseSessionStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "getEvents",
+        "tags": [
+          "events"
+        ],
+        "summary": "List workspace events",
+        "description": "Minimum role: `VIEWER`. Active workspace via the `X-Workspace-Id` header. Each event embeds `nextDate` (its next upcoming date, or null) and `artists` (the linked lineup, in the organizer's order), so rendering a catalog doesn't require `/events/{id}/dates` or one request per artist.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "id of the last result from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search by name/description, case- and accent-insensitive",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filter by status (DRAFT | PUBLISHED | SOLD_OUT | CANCELLED | COMPLETED). Applied in the query, so `limit` only counts returned rows.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "SOLD_OUT",
+                "CANCELLED",
+                "COMPLETED"
+              ]
+            }
+          },
+          {
+            "name": "withTotal",
+            "in": "query",
+            "required": false,
+            "description": "`1` to include `page.total` (count over the same filter). Opt-in: without it, the extra query is skipped.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Warning"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postEvents",
+        "tags": [
+          "events"
+        ],
+        "summary": "Create an event",
+        "description": "Minimum role: `ADMIN`. Active workspace via the `X-Workspace-Id` header.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Event"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -561,268 +1168,6 @@
         }
       }
     },
-    "/events": {
-      "get": {
-        "operationId": "getEvents",
-        "tags": [
-          "events"
-        ],
-        "summary": "List workspace events",
-        "description": "Minimum role: `VIEWER`. Active workspace via the `X-Workspace-Id` header. Each event embeds `nextDate` (its next upcoming date, or null) and `artists` (the linked lineup, in the organizer's order), so rendering a catalog doesn't require `/events/{id}/dates` or one request per artist.",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "description": "1-100, default 20",
-            "schema": {
-              "type": "integer",
-              "default": 20
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "description": "id of the last result from the previous page",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "required": false,
-            "description": "Search by name/description, case- and accent-insensitive",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "description": "Filter by status (DRAFT | PUBLISHED | SOLD_OUT | CANCELLED | COMPLETED). Applied in the query, so `limit` only counts returned rows.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "DRAFT",
-                "PUBLISHED",
-                "SOLD_OUT",
-                "CANCELLED",
-                "COMPLETED"
-              ]
-            }
-          },
-          {
-            "name": "withTotal",
-            "in": "query",
-            "required": false,
-            "description": "`1` to include `page.total` (count over the same filter). Opt-in: without it, the extra query is skipped.",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Event"
-                      }
-                    },
-                    "page": {
-                      "$ref": "#/components/schemas/Page"
-                    },
-                    "warnings": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Warning"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data",
-                    "page"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "postEvents",
-        "tags": [
-          "events"
-        ],
-        "summary": "Create an event",
-        "description": "Minimum role: `ADMIN`. Active workspace via the `X-Workspace-Id` header.",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EventCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/Event"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/events/{id}": {
       "get": {
         "operationId": "getEventsId",
@@ -1030,7 +1375,7 @@
           "events"
         ],
         "summary": "Delete an event (soft delete)",
-        "description": "Minimum role: `ADMIN`. Active workspace via the `X-Workspace-Id` header.",
+        "description": "Minimum role: `ADMIN`. Active workspace via the `X-Workspace-Id` header.\n\nReturns 409 `EVENT_HAS_SALES` when the event has CONFIRMED or REFUNDED sales; cancel it with `POST /events/{id}/cancel` instead.",
         "security": [
           {
             "apiKey": []
@@ -1091,6 +1436,16 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4011,6 +4366,17 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
               }
             }
           }
@@ -7553,6 +7919,123 @@
         }
       }
     },
+    "/tickets/{ticketCode}/resend": {
+      "post": {
+        "operationId": "postTicketsTicketCodeResend",
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Resend the confirmation email with the ticket",
+        "description": "Minimum role: `ADMIN`. Active workspace via the `X-Workspace-Id` header.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticketCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ResendTicket"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The external provider failed to complete the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticketCode}/checkin": {
       "post": {
         "operationId": "postTicketsTicketCodeCheckin",
@@ -8154,6 +8637,17 @@
                   "$ref": "#/components/schemas/Error"
                 }
               }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
             }
           }
         }
@@ -8245,6 +8739,17 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
               }
             }
           }
@@ -9317,6 +9822,688 @@
         }
       }
     },
+    "/customer/orders/{id}/payment": {
+      "post": {
+        "operationId": "postCustomerOrdersIdPayment",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "Open payment for a reservation (Bold or MercadoPago, depending on the event)",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). The payment rail is chosen on the SERVER: Bold-eligible events (legend plan + allowlist) return the SIGNED configuration of the embedded Bold Payment Button (`apiKey` + `renderMode: \"embedded\"` + `integritySignature`, …), which the landing page mounts with `new BoldCheckout({...})`; all others return `publicKey` + `amount` + `currency` + `reference` + `payerEmail` to mount the MercadoPago Payment Brick (`POST .../payment/card` to charge, `POST .../payment/pse` for PSE). The landing page tells the rails apart by the SHAPE of the response (`apiKey`/`renderMode` ⇒ Bold, `publicKey` ⇒ MercadoPago), never by a separate flag. The sale must belong to the session buyer (and, with a key, to the workspace pinned to it): anything else is 404. Responds 409 with code `PAYMENT_UNAVAILABLE` if the reservation expired, the sale is no longer pending, or (Bold only) the event has no legend plan or a payment attempt is already in flight with another gateway. `{id}` accepts the sale id or its `reference`. Limited to 10 opens per minute per buyer (429 with `Retry-After`).",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Purchase-Session",
+            "in": "header",
+            "required": false,
+            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderStartPayment"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/orders/{id}/payment/card": {
+      "post": {
+        "operationId": "postCustomerOrdersIdPaymentCard",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "Charge with the MercadoPago Payment Brick token",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). Receives the token the Payment Brick produced on the landing page's domain and charges through the Orders API using the sale amount (never one sent by the client); `payer.email` travels in the body but is ignored — the payer is ALWAYS the sale's. `status` is `approved`, `pending` (normal, may require additional authentication from the bank) or `rejected` (business decline; the reason is in `message`) — all three are returned with 200. With `rejected`, `saleAlive` tells what happened to the purchase: `false` = it was cancelled and a new one must be started; `true` = this payment was declined but the purchase is still pending because another payment is in progress on it (do not start a new purchase: wait and check the order). Responds 409 with code `PAYMENT_UNAVAILABLE` if the reservation expired, the sale is no longer pending, a payment attempt is in flight with another gateway, the event only charges through Bold, or MercadoPago returned an error that cannot be classified as a decline. The sale must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. `{id}` accepts the sale id or its `reference`. Limited to 10 attempts per minute per buyer (429 with `Retry-After`).",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Purchase-Session",
+            "in": "header",
+            "required": false,
+            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerOrderMercadoPagoChargeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderMercadoPagoChargeResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/orders/{id}/payment/pse": {
+      "post": {
+        "operationId": "postCustomerOrdersIdPaymentPse",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "Open a PSE payment through MercadoPago (redirect)",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). Creates a MercadoPago preference restricted to PSE and returns `redirectUrl` (`init_point`): the landing page must REDIRECT the browser there, not mount it in an iframe. The buyer picks their bank and confirms the transfer inside MercadoPago; on return, they land on `GET /api/mp/return` (our domain), which issues a 302 to the `returnUrl` sent in `POST /customer/orders` — the landing page must call `GET /customer/orders/{id}` for the authoritative status, never infer it from the return URL. The sale is confirmed by webhook when the bank settles the payment (asynchronous: it may take a while). Responds 409 with code `PAYMENT_UNAVAILABLE` if the reservation expired, the sale is no longer pending, a payment attempt is in flight with another gateway, or the event only charges through Bold. The sale must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. `{id}` accepts the sale id or its `reference`. Limited to 10 opens per minute per buyer (429 with `Retry-After`).",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Purchase-Session",
+            "in": "header",
+            "required": false,
+            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderMercadoPagoPse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/orders/{id}/release": {
+      "post": {
+        "operationId": "postCustomerOrdersIdRelease",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "Release a reservation the buyer will not pay for",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). Abandons the PENDING sale and returns its inventory (and its seats) to stock, so the buyer can start over without waiting for the reservation to expire. It is the counterpart of `pending_sale_in_progress`: when `POST /customer/orders` rejects with that `reason`, the landing page can offer *continue paying* (`/payment`, idempotent) or *start over* (this route). It ONLY releases with evidence that nobody started the payment: if Bold reports any transaction, if a provider response is already stored, or if the payment goes through a rail we cannot query, it responds 409 with `details.reason` = `payment_in_flight` and the sale is left intact. If the gateway does not respond, 503 (`gateway_unreachable`): retry later. The sale must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. `{id}` accepts the sale id or its `reference`. Limited to 10 calls per minute per buyer.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderRelease"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource does not allow this operation in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: an external dependency is down or initialization failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/orders/{id}": {
+      "get": {
+        "operationId": "getCustomerOrdersId",
+        "tags": [
+          "customer",
+          "orders"
+        ],
+        "summary": "Status of a headless purchase (and its tickets, once paid)",
+        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). `{id}` accepts the `reference` (FT-…) or the sale id. If the sale is still PENDING and its payment goes through Bold, the authoritative payment status is re-read from Bold; between re-reads it responds with the internal status, which the webhook keeps up to date. `status` is `approved`, `pending` or `rejected`; `pending` is a NORMAL state (asynchronous payment methods take time) and the landing page must retry. `tickets` —with each ticket's `ticketCode`— is only present when `status` is `approved`. The purchase must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. The route MAY rate-limit polling and respond 429: honor `Retry-After` and apply backoff. Polling every ~2 s fits comfortably, but do not treat any threshold as a guarantee.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "apiKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerOrderStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or resource not accessible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource does not exist or is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body/parameter validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          }
+        }
+      }
+    },
     "/customer/purchase-sessions": {
       "post": {
         "operationId": "postCustomerPurchaseSessions",
@@ -9440,108 +10627,21 @@
                   "$ref": "#/components/schemas/Error"
                 }
               }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
             }
           },
           "503": {
             "description": "Service unavailable: an external dependency is down or initialization failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/customer/purchase-sessions/{id}": {
-      "get": {
-        "operationId": "getCustomerPurchaseSessionsId",
-        "tags": [
-          "customer",
-          "purchase-sessions"
-        ],
-        "summary": "Purchase session status",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL. Returns the status of one of THE buyer's purchase sessions: `live` (this tab can create the order), `superseded` (another tab or device replaced it: stop offering the map and the payment), `expired` (the map clock ran out or it was released) or `converted` (it already created its order: `orderId`). A session whose `seatsDeadline` has passed is reported as `expired` immediately. Designed to be polled every ~10 s. Another buyer's session is 404.",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/PurchaseSessionStatus"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9655,6 +10755,17 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
               }
             }
           }
@@ -10224,7 +11335,7 @@
           "content"
         ],
         "summary": "Signed token to play a video or a live stream",
-        "description": "Requires an enterprise service API key. `memberOnly` content additionally requires the `X-Customer-Session` header of a buyer with a current membership in the key's organization (otherwise 403 `MEMBERSHIP_REQUIRED`). Content from another organization responds 404. Short-lived tokens: 30 minutes for live streams, 1 hour for videos.",
+        "description": "Requires an enterprise service API key. `memberOnly` content additionally requires the `X-Customer-Session` header of a buyer with a current membership in the key's organization or, for a live stream tied to a show date, a CONFIRMED ticket for that date (otherwise 403 `MEMBERSHIP_REQUIRED`). Rate limited: 600 requests/min per key and 30/min per buyer (429 `RATE_LIMITED` with `Retry-After`). Content from another organization responds 404. Short-lived tokens: 30 minutes for live streams, 1 hour for videos.",
         "security": [
           {
             "apiKey": []
@@ -10313,6 +11424,27 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests: rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            }
+          },
           "503": {
             "description": "Service unavailable: an external dependency is down or initialization failed.",
             "content": {
@@ -10326,219 +11458,14 @@
         }
       }
     },
-    "/tickets/{ticketCode}/resend": {
+    "/waitlist": {
       "post": {
-        "operationId": "postTicketsTicketCodeResend",
+        "operationId": "postWaitlist",
         "tags": [
-          "tickets"
+          "waitlist"
         ],
-        "summary": "Resend the confirmation email with the ticket",
-        "description": "Minimum role: `ADMIN`. Active workspace via the `X-Workspace-Id` header.",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "ticketCode",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/ResendTicket"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/customer/orders": {
-      "get": {
-        "operationId": "getCustomerOrders",
-        "tags": [
-          "customer",
-          "orders"
-        ],
-        "summary": "The purchase the buyer left unfinished for this event date",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL: with a key, results are additionally scoped to the workspace pinned to it; without a key, any of the buyer's own unfinished purchases is visible. Returns the PENDING sale whose inventory hold is STILL ALIVE that the buyer has for that event date —with its seats, its total and when it expires—, or `order: null` if there is none. This is what lets reloading the checkout, or coming back from signing in, RESUME the purchase instead of starting from scratch: the seats remain held in that person's name. If `paymentOpened` is true the payment is already open and `POST /customer/orders/{id}/payment` returns the SAME signed configuration; to discard it and pick other seats, use `POST /customer/orders/{id}/release`.",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "eventDateId",
-            "in": "query",
-            "required": false,
-            "description": "Required. The event date being queried.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/CustomerOrderCurrent"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Operation error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "postCustomerOrders",
-        "tags": [
-          "customer",
-          "orders"
-        ],
-        "summary": "Create the ticket reservation (step 1 of the headless purchase)",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL: with a key, the date and the ticket type must belong to the workspace pinned to it (anything else is 404); without a key, it is enough for the ticket type to exist and be on sale (same eligibility as the first-party checkout). Reserves inventory and creates the PENDING sale with the SAME rules as the first-party checkout (stock under lock, seats validated against seats.io, per-buyer limit, presale, memberships and virtual queue turn). The buyer email comes from the session, never from the body. Rejections carry a stable `reason` in `error.details.reason` (`sold_out`, `queue_turn_required`, `seats_not_held`, `members_only`, `members_only_withdrawn` — a members-only ticket whose artist withdrew the permission or left the lineup: it is no longer sold even to members —, …). With `pending_sale_in_progress` the inventory is taken by a half-paid purchase FROM THE SAME buyer: `error.details.pendingSaleId` and `pendingReference` identify it, and the right step is to reopen its payment with `POST /customer/orders/{pendingSaleId}/payment` (idempotent) instead of reserving again. If `free` is true the sale is already confirmed and `/payment` must NOT be called. Next step: `POST /customer/orders/{id}/payment`.",
+        "summary": "Join the per-city waitlist of an enterprise landing",
+        "description": "Requires an enterprise service API key; the entry belongs to the key's organization. `X-Customer-Session` is optional: when present the entry is linked to that buyer. `contact` must be an email or a phone number (7-15 digits; only a leading `+`, spaces and dashes besides digits — parentheses, dots, letters or extensions respond 422). Phones are stored without spaces or dashes. Idempotent per (organization, city folded without accents/case, contact normalized — lowercased email, or the last 10 phone digits so `+57 300…` and `300…` are the same contact): 201 with `created: true` on the first call, 200 with `created: false` afterwards. Rate limited: 120 requests/min per key and 10/min per contact (429 `RATE_LIMITED` with `Retry-After`). Invalid JSON responds 400; an invalid body 422.",
         "security": [
           {
             "apiKey": []
@@ -10558,10 +11485,10 @@
             }
           },
           {
-            "name": "X-Purchase-Session",
+            "name": "X-Customer-Session",
             "in": "header",
             "required": false,
-            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
+            "description": "Optional buyer session token; links the entry to that buyer.",
             "schema": {
               "type": "string"
             }
@@ -10572,12 +11499,30 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CustomerOrderCreateRequest"
+                "$ref": "#/components/schemas/WaitlistEntryCreate"
               }
             }
           }
         },
         "responses": {
+          "200": {
+            "description": "Already on this city's waitlist (`created: false`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/WaitlistEntryResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
           "201": {
             "description": "OK",
             "content": {
@@ -10586,12 +11531,22 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/CustomerOrderCreateResult"
+                      "$ref": "#/components/schemas/WaitlistEntryResult"
                     }
                   },
                   "required": [
                     "data"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: malformed parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -10618,16 +11573,6 @@
           },
           "404": {
             "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10654,549 +11599,28 @@
                   "$ref": "#/components/schemas/Error"
                 }
               }
-            }
-          },
-          "503": {
-            "description": "Service unavailable: an external dependency is down or initialization failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
+            },
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
               }
             }
           }
         }
-      }
-    },
-    "/customer/orders/{id}/payment": {
-      "post": {
-        "operationId": "postCustomerOrdersIdPayment",
-        "tags": [
-          "customer",
-          "orders"
-        ],
-        "summary": "Open payment for a reservation (Bold or MercadoPago, depending on the event)",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). The payment rail is chosen on the SERVER: Bold-eligible events (legend plan + allowlist) return the SIGNED configuration of the embedded Bold Payment Button (`apiKey` + `renderMode: \"embedded\"` + `integritySignature`, …), which the landing page mounts with `new BoldCheckout({...})`; all others return `publicKey` + `amount` + `currency` + `reference` + `payerEmail` to mount the MercadoPago Payment Brick (`POST .../payment/card` to charge, `POST .../payment/pse` for PSE). The landing page tells the rails apart by the SHAPE of the response (`apiKey`/`renderMode` ⇒ Bold, `publicKey` ⇒ MercadoPago), never by a separate flag. The sale must belong to the session buyer (and, with a key, to the workspace pinned to it): anything else is 404. Responds 409 with code `PAYMENT_UNAVAILABLE` if the reservation expired, the sale is no longer pending, or (Bold only) the event has no legend plan or a payment attempt is already in flight with another gateway. `{id}` accepts the sale id or its `reference`. Limited to 10 opens per minute per buyer (429 with `Retry-After`).",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Purchase-Session",
-            "in": "header",
-            "required": false,
-            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/CustomerOrderStartPayment"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests: rate limit exceeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/customer/orders/{id}/payment/card": {
-      "post": {
-        "operationId": "postCustomerOrdersIdPaymentCard",
-        "tags": [
-          "customer",
-          "orders"
-        ],
-        "summary": "Charge with the MercadoPago Payment Brick token",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). Receives the token the Payment Brick produced on the landing page's domain and charges through the Orders API using the sale amount (never one sent by the client); `payer.email` travels in the body but is ignored — the payer is ALWAYS the sale's. `status` is `approved`, `pending` (normal, may require additional authentication from the bank) or `rejected` (business decline; the reason is in `message`) — all three are returned with 200. With `rejected`, `saleAlive` tells what happened to the purchase: `false` = it was cancelled and a new one must be started; `true` = this payment was declined but the purchase is still pending because another payment is in progress on it (do not start a new purchase: wait and check the order). Responds 409 with code `PAYMENT_UNAVAILABLE` if the reservation expired, the sale is no longer pending, a payment attempt is in flight with another gateway, the event only charges through Bold, or MercadoPago returned an error that cannot be classified as a decline. The sale must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. `{id}` accepts the sale id or its `reference`. Limited to 10 attempts per minute per buyer (429 with `Retry-After`).",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Purchase-Session",
-            "in": "header",
-            "required": false,
-            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CustomerOrderMercadoPagoChargeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/CustomerOrderMercadoPagoChargeResult"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Operation error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests: rate limit exceeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/customer/orders/{id}/payment/pse": {
-      "post": {
-        "operationId": "postCustomerOrdersIdPaymentPse",
-        "tags": [
-          "customer",
-          "orders"
-        ],
-        "summary": "Open a PSE payment through MercadoPago (redirect)",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). Creates a MercadoPago preference restricted to PSE and returns `redirectUrl` (`init_point`): the landing page must REDIRECT the browser there, not mount it in an iframe. The buyer picks their bank and confirms the transfer inside MercadoPago; on return, they land on `GET /api/mp/return` (our domain), which issues a 302 to the `returnUrl` sent in `POST /customer/orders` — the landing page must call `GET /customer/orders/{id}` for the authoritative status, never infer it from the return URL. The sale is confirmed by webhook when the bank settles the payment (asynchronous: it may take a while). Responds 409 with code `PAYMENT_UNAVAILABLE` if the reservation expired, the sale is no longer pending, a payment attempt is in flight with another gateway, or the event only charges through Bold. The sale must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. `{id}` accepts the sale id or its `reference`. Limited to 10 opens per minute per buyer (429 with `Retry-After`).",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Purchase-Session",
-            "in": "header",
-            "required": false,
-            "description": "Purchase session id (`POST /customer/purchase-sessions`). Required when the event's workspace enforces a single purchase session; if present, it is always validated. The requirement is decided by the EVENT, not the API key: it applies if the owning workspace, a linked artist or a catalog seller of the show has the flag, with or without a key. Rejections (409; uppercase `error.code` and the slug in `error.details.reason`): `PURCHASE_SESSION_REQUIRED` (missing, or belongs to another buyer or another event date), `PURCHASE_SESSION_SUPERSEDED` (another tab or device replaced it), `PURCHASE_SESSION_EXPIRED` (the map clock ran out before the order was created), `PURCHASE_SESSION_BUSY` (an order is already in flight with this session) and, on `POST /customer/orders` with seats, `HOLD_TOKEN_MISMATCH` (the `holdToken` is not the session's, or belongs to a replaced session or another buyer even if the header is absent). Payment POSTs accept the buyer's live session or the session that created THAT order, as long as no other session has been opened since. Rejecting a new payment NEVER affects a payment already in flight.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/CustomerOrderMercadoPagoPse"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests: rate limit exceeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/customer/orders/{id}/release": {
-      "post": {
-        "operationId": "postCustomerOrdersIdRelease",
-        "tags": [
-          "customer",
-          "orders"
-        ],
-        "summary": "Release a reservation the buyer will not pay for",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). Abandons the PENDING sale and returns its inventory (and its seats) to stock, so the buyer can start over without waiting for the reservation to expire. It is the counterpart of `pending_sale_in_progress`: when `POST /customer/orders` rejects with that `reason`, the landing page can offer *continue paying* (`/payment`, idempotent) or *start over* (this route). It ONLY releases with evidence that nobody started the payment: if Bold reports any transaction, if a provider response is already stored, or if the payment goes through a rail we cannot query, it responds 409 with `details.reason` = `payment_in_flight` and the sale is left intact. If the gateway does not respond, 503 (`gateway_unreachable`): retry later. The sale must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. `{id}` accepts the sale id or its `reference`. Limited to 10 calls per minute per buyer.",
-        "security": [
-          {
-            "apiKey": []
-          },
-          {
-            "apiKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Workspace-Id",
-            "in": "header",
-            "required": false,
-            "description": "Active workspace to operate on. Optional: when omitted, the default workspace of the user who owns the key is used (pickActiveOrg).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/CustomerOrderRelease"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credential.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Insufficient role or resource not accessible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource does not exist or is out of scope.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict: the resource does not allow this operation in its current state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests: rate limit exceeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service unavailable: an external dependency is down or initialization failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/customer/orders/{id}": {
+      },
       "get": {
-        "operationId": "getCustomerOrdersId",
+        "operationId": "getWaitlist",
         "tags": [
-          "customer",
-          "orders"
+          "waitlist"
         ],
-        "summary": "Status of a headless purchase (and its tickets, once paid)",
-        "description": "Requires the `X-Customer-Session` header. The enterprise service API key is OPTIONAL (with a key, results are additionally scoped to the workspace pinned to it). `{id}` accepts the `reference` (FT-…) or the sale id. If the sale is still PENDING and its payment goes through Bold, the authoritative payment status is re-read from Bold; between re-reads it responds with the internal status, which the webhook keeps up to date. `status` is `approved`, `pending` or `rejected`; `pending` is a NORMAL state (asynchronous payment methods take time) and the landing page must retry. `tickets` —with each ticket's `ticketCode`— is only present when `status` is `approved`. The purchase must belong to the session's buyer (and, with a key, to the workspace pinned to it): anything else is 404. The route MAY rate-limit polling and respond 429: honor `Retry-After` and apply backoff. Polling every ~2 s fits comfortably, but do not treat any threshold as a guarantee.",
+        "summary": "List the waitlist entries of the workspace",
+        "description": "Export for staff (CLI/MCP). Contains personal data, so it requires ADMIN. Newest first, cursor pagination; `city` filters by the folded city (accents and case ignored).",
         "security": [
           {
             "apiKey": []
@@ -11207,9 +11631,28 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
+            "name": "city",
+            "in": "query",
+            "required": false,
+            "description": "City name; accents and case are ignored",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-100, default 20",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -11233,11 +11676,18 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/CustomerOrderStatus"
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WaitlistEntry"
+                      }
+                    },
+                    "page": {
+                      "$ref": "#/components/schemas/Page"
                     }
                   },
                   "required": [
-                    "data"
+                    "data",
+                    "page"
                   ]
                 }
               }
@@ -11275,16 +11725,6 @@
           },
           "422": {
             "description": "Request body/parameter validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests: rate limit exceeded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14220,6 +14660,776 @@
         ],
         "additionalProperties": false
       },
+      "PurchaseSessionCreateRequest": {
+        "type": "object",
+        "properties": {
+          "eventDateId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "deviceKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200,
+            "description": "Stable browser identifier (e.g. stored in localStorage). If the SAME browser reopens the SAME event date while its session is still alive, it gets that same session (same `holdToken`, same clock) instead of a new one."
+          }
+        },
+        "required": [
+          "eventDateId",
+          "deviceKey"
+        ],
+        "additionalProperties": false
+      },
+      "PurchaseSessionCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "eventDateId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "const": "live"
+          },
+          "seated": {
+            "type": "boolean",
+            "description": "true = the event date has a seats.io map."
+          },
+          "holdToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "seats.io hold token ISSUED BY THE SERVER. Mount the chart with `session: \"manual\"` and this `holdToken` (https://docs.seats.io/docs/renderer/config-session/), never with `session: \"continue\"`. It is the ONLY token `POST /customer/orders` accepts for this session. null for event dates without a map."
+          },
+          "seatsDeadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Instant (ISO 8601 UTC) until which the order with seats can be created. This is the clock to display over the map. The seats.io hold expires AFTER this instant, never before. null for event dates without a map."
+          },
+          "budgetSeconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Budget seconds granted to this session (= seatsDeadline − now). The budget is CUMULATIVE per buyer and event date: opening another tab does not reset it."
+          },
+          "replacedSessionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Live session that this one replaced (now `superseded`), or null. That tab can no longer create an order or start a new payment."
+          }
+        },
+        "required": [
+          "id",
+          "eventDateId",
+          "state",
+          "seated",
+          "holdToken",
+          "seatsDeadline",
+          "budgetSeconds",
+          "replacedSessionId"
+        ],
+        "additionalProperties": false
+      },
+      "PurchaseSessionStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "superseded",
+              "expired",
+              "converted"
+            ],
+            "description": "`live`: can create the order. `superseded`: another tab/device replaced it. `expired`: the map clock ran out or it was released. `converted`: it already created its order (`orderId`)."
+          },
+          "seatsDeadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "orderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sale created with this session, if any."
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "seatsDeadline",
+          "orderId"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerTicketItem": {
+        "type": "object",
+        "properties": {
+          "ticketTypeName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "ticketCode": {
+            "type": "string",
+            "description": "Opaque ticket code. The QR code must encode the validator URL (`https://admin.appfreeticket.com/dashboard/tickets/validar?code=<ticketCode>`)."
+          },
+          "seatLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact seat for seated events (seats.io), or null."
+          }
+        },
+        "required": [
+          "ticketTypeName",
+          "quantity",
+          "ticketCode",
+          "seatLabel"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerSale": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "event": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "slug"
+            ],
+            "additionalProperties": false
+          },
+          "eventDate": {
+            "type": "object",
+            "properties": {
+              "startsAt": {
+                "type": "string",
+                "description": "Event start instant in ISO 8601 UTC."
+              },
+              "timezone": {
+                "type": "string",
+                "description": "IANA time zone of the event."
+              }
+            },
+            "required": [
+              "startsAt",
+              "timezone"
+            ],
+            "additionalProperties": false
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerTicketItem"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "event",
+          "eventDate",
+          "items",
+          "total",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderCreateResult": {
+        "type": "object",
+        "properties": {
+          "free": {
+            "type": "boolean",
+            "description": "true = the purchase was CONFIRMED without a payment gateway (100% discount). In that case do NOT call /payment: there is nothing to charge and the other fields are null."
+          },
+          "reference": {
+            "type": "string",
+            "description": "Sale reference (FT-…). Always identifies the purchase."
+          },
+          "saleId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sale id. null when `free` is true."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Amount to charge. null when `free` is true."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Instant (ISO 8601 UTC) at which the inventory reservation expires. After that, the purchase must be started over."
+          }
+        },
+        "required": [
+          "free",
+          "reference",
+          "saleId",
+          "total",
+          "currency",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderCurrent": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "saleId": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "number"
+                  },
+                  "currency": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "description": "Instant (ISO 8601 UTC) at which the inventory hold expires. This is the countdown to display."
+                  },
+                  "paymentOpened": {
+                    "type": "boolean",
+                    "description": "true = payment has already been opened for this sale. Reopening it with /payment returns the SAME signed configuration while the reservation is still alive."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ticketTypeId": {
+                          "type": "string"
+                        },
+                        "ticketTypeName": {
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "seatLabel": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "seats.io numbered seat, or null if not seated."
+                        }
+                      },
+                      "required": [
+                        "ticketTypeId",
+                        "ticketTypeName",
+                        "quantity",
+                        "seatLabel"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "saleId",
+                  "reference",
+                  "total",
+                  "currency",
+                  "expiresAt",
+                  "paymentOpened",
+                  "items"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The purchase the buyer left unfinished for this event date, or null if there is none."
+          }
+        },
+        "required": [
+          "order"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderRelease": {
+        "type": "object",
+        "properties": {
+          "released": {
+            "type": "boolean",
+            "const": true,
+            "description": "The sale is now ABANDONED and its inventory went back to stock. A rejection never lands here: it is returned as an error with `details.reason`."
+          }
+        },
+        "required": [
+          "released"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderPayment": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "description": "Merchant reference = `reference`."
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Whole pesos, no decimals."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "Bold IDENTITY key (public, sent to the browser)."
+          },
+          "integritySignature": {
+            "type": "string",
+            "description": "SHA256 that binds the charge to the amount. Computed on the server."
+          },
+          "renderMode": {
+            "type": "string",
+            "const": "embedded"
+          },
+          "redirectionUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expirationDate": {
+            "type": "number",
+            "description": "Epoch in NANOSECONDS (what the Bold library expects)."
+          }
+        },
+        "required": [
+          "orderId",
+          "amount",
+          "currency",
+          "apiKey",
+          "integritySignature",
+          "renderMode",
+          "redirectionUrl",
+          "description",
+          "expirationDate"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderMercadoPagoConfig": {
+        "type": "object",
+        "properties": {
+          "publicKey": {
+            "type": "string",
+            "description": "MercadoPago (Tickets) public key. Sent to the browser: it is what `initMercadoPago()`/`<Payment>` from the `@mercadopago/sdk-react` SDK (or equivalent) receives to mount the Payment Brick. Present ONLY on the MercadoPago rail — it is the marker the landing page uses to tell it apart from the Bold rail (which carries `apiKey`+`renderMode` and NEVER `publicKey`)."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount to charge, in the currency's major unit (pesos, not cents) — the same `total` already returned by `POST /customer/orders`. It is re-read from the sale on every call: do not treat it as final if a long time passes between mounting the Brick and charging."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Sale reference (FT-…)."
+          },
+          "payerEmail": {
+            "type": "string",
+            "description": "Buyer email (from the sale, not editable). Informational: the charge ALWAYS uses the sale's email, never one sent by the client."
+          }
+        },
+        "required": [
+          "publicKey",
+          "amount",
+          "currency",
+          "reference",
+          "payerEmail"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderStartPayment": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/CustomerOrderPayment"
+          },
+          {
+            "$ref": "#/components/schemas/CustomerOrderMercadoPagoConfig"
+          }
+        ]
+      },
+      "CustomerOrderMercadoPagoChargeRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Card token returned by the Payment Brick when tokenizing."
+          },
+          "paymentMethodId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "`payment_method_id` returned by the Brick (e.g. `visa`, `debmaster`)."
+          },
+          "installments": {
+            "default": 1,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "issuerId": {
+            "description": "`issuer_id` returned by the Brick. Some BINs require it.",
+            "type": "string"
+          },
+          "payer": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "description": "Ignored: the charge ALWAYS uses the sale's email, never one sent by the client.",
+                "type": "string"
+              },
+              "identification": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "number"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "token",
+          "paymentMethodId",
+          "installments"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderMercadoPagoChargeResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "pending",
+              "rejected"
+            ],
+            "description": "`pending` is normal: it may require additional authentication from the bank. `rejected` is a business decline (funds, card details, …) — the buyer can retry with another card."
+          },
+          "reference": {
+            "type": "string"
+          },
+          "message": {
+            "description": "Human-readable message for the buyer. Only present with `rejected`.",
+            "type": "string"
+          },
+          "saleAlive": {
+            "description": "Only present with `rejected`. `false`: the purchase was cancelled and its tickets (and seats) went back to inventory — a new purchase must be started. `true`: THIS payment was declined but the purchase is still pending because another payment is in progress on it (e.g. a PSE payment waiting on the bank); do NOT start a new purchase: show the message, wait, and check the order status.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "reference"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderMercadoPagoPse": {
+        "type": "object",
+        "properties": {
+          "redirectUrl": {
+            "type": "string",
+            "description": "`init_point` of the MercadoPago preference. Redirect the buyer there (it is not an iframe): they pick their bank and confirm the transfer on MercadoPago."
+          }
+        },
+        "required": [
+          "redirectUrl"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderStatus": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "pending",
+              "rejected"
+            ],
+            "description": "`pending` is a NORMAL state: Bold may take a while to reflect the payment (PSE, Nequi and the Bancolombia button approve asynchronously) and the webhook settles it. The landing page must retry, not treat the purchase as lost."
+          },
+          "saleStatus": {
+            "type": "string",
+            "description": "Internal sale status (PENDING, CONFIRMED, …)."
+          },
+          "total": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "tickets": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CustomerTicketItem"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tickets with their `ticketCode`. ONLY present when `status` is `approved`; null in any other case. A code handed out before the payment settles would be a valid ticket with no money behind it."
+          }
+        },
+        "required": [
+          "reference",
+          "status",
+          "saleStatus",
+          "total",
+          "currency",
+          "tickets"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderItem": {
+        "type": "object",
+        "properties": {
+          "ticketTypeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "seats": {
+            "description": "seats.io labels. Only for seated events.",
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        },
+        "required": [
+          "ticketTypeId",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerOrderCreateRequest": {
+        "type": "object",
+        "properties": {
+          "eventDateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerOrderItem"
+            }
+          },
+          "holdToken": {
+            "description": "Hold token of the seats.io map session. Required if seats are sent.",
+            "type": "string",
+            "maxLength": 120
+          },
+          "discountCode": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "buyer": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 120
+              },
+              "phone": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "idType": {
+                "type": "string",
+                "enum": [
+                  "CC",
+                  "CE",
+                  "NIT",
+                  "PP",
+                  "TI",
+                  "PEP"
+                ]
+              },
+              "idNumber": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 20
+              },
+              "nitDigit": {
+                "description": "Check digit. Required if idType is NIT.",
+                "type": "string",
+                "maxLength": 1
+              }
+            },
+            "required": [
+              "name",
+              "phone",
+              "idType",
+              "idNumber"
+            ],
+            "additionalProperties": false
+          },
+          "returnUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Absolute URL of the landing page the buyer returns to. Validated against the enterprise domain allowlist and the workspace that owns the event; if it fails validation it is ignored and the purchase proceeds as usual."
+          }
+        },
+        "required": [
+          "eventDateId",
+          "items",
+          "buyer",
+          "returnUrl"
+        ],
+        "additionalProperties": false
+      },
       "SaleCreate": {
         "type": "object",
         "properties": {
@@ -14872,6 +16082,16 @@
                   "type": "integer",
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "PERCENT",
+                    "AMOUNT"
+                  ]
                 }
               },
               "required": [
@@ -15583,6 +16803,26 @@
         },
         "additionalProperties": false
       },
+      "ResendTicket": {
+        "type": "object",
+        "properties": {
+          "ticketCode": {
+            "type": "string"
+          },
+          "sentTo": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketCode",
+          "sentTo",
+          "sentAt"
+        ],
+        "additionalProperties": false
+      },
       "CheckinResult": {
         "type": "object",
         "properties": {
@@ -15991,112 +17231,6 @@
         ],
         "additionalProperties": false
       },
-      "CustomerTicketItem": {
-        "type": "object",
-        "properties": {
-          "ticketTypeName": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "ticketCode": {
-            "type": "string",
-            "description": "Opaque ticket code. The QR code must encode the validator URL (`https://admin.appfreeticket.com/dashboard/tickets/validar?code=<ticketCode>`)."
-          },
-          "seatLabel": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Exact seat for seated events (seats.io), or null."
-          }
-        },
-        "required": [
-          "ticketTypeName",
-          "quantity",
-          "ticketCode",
-          "seatLabel"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerSale": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "reference": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "event": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "slug": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "slug"
-            ],
-            "additionalProperties": false
-          },
-          "eventDate": {
-            "type": "object",
-            "properties": {
-              "startsAt": {
-                "type": "string",
-                "description": "Event start instant in ISO 8601 UTC."
-              },
-              "timezone": {
-                "type": "string",
-                "description": "IANA time zone of the event."
-              }
-            },
-            "required": [
-              "startsAt",
-              "timezone"
-            ],
-            "additionalProperties": false
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CustomerTicketItem"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "currency": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "reference",
-          "status",
-          "event",
-          "eventDate",
-          "items",
-          "total",
-          "currency"
-        ],
-        "additionalProperties": false
-      },
       "CustomerTicketCancelResult": {
         "type": "object",
         "properties": {
@@ -16391,561 +17525,6 @@
             ]
           }
         },
-        "additionalProperties": false
-      },
-      "PurchaseSessionCreateRequest": {
-        "type": "object",
-        "properties": {
-          "eventDateId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
-          },
-          "deviceKey": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 200,
-            "description": "Stable browser identifier (e.g. stored in localStorage). If the SAME browser reopens the SAME event date while its session is still alive, it gets that same session (same `holdToken`, same clock) instead of a new one."
-          }
-        },
-        "required": [
-          "eventDateId",
-          "deviceKey"
-        ],
-        "additionalProperties": false
-      },
-      "PurchaseSessionCreated": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "eventDateId": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string",
-            "const": "live"
-          },
-          "seated": {
-            "type": "boolean",
-            "description": "true = the event date has a seats.io map."
-          },
-          "holdToken": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "seats.io hold token ISSUED BY THE SERVER. Mount the chart with `session: \"manual\"` and this `holdToken` (https://docs.seats.io/docs/renderer/config-session/), never with `session: \"continue\"`. It is the ONLY token `POST /customer/orders` accepts for this session. null for event dates without a map."
-          },
-          "seatsDeadline": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Instant (ISO 8601 UTC) until which the order with seats can be created. This is the clock to display over the map. The seats.io hold expires AFTER this instant, never before. null for event dates without a map."
-          },
-          "budgetSeconds": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Budget seconds granted to this session (= seatsDeadline − now). The budget is CUMULATIVE per buyer and event date: opening another tab does not reset it."
-          },
-          "replacedSessionId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Live session that this one replaced (now `superseded`), or null. That tab can no longer create an order or start a new payment."
-          }
-        },
-        "required": [
-          "id",
-          "eventDateId",
-          "state",
-          "seated",
-          "holdToken",
-          "seatsDeadline",
-          "budgetSeconds",
-          "replacedSessionId"
-        ],
-        "additionalProperties": false
-      },
-      "PurchaseSessionStatus": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "live",
-              "superseded",
-              "expired",
-              "converted"
-            ],
-            "description": "`live`: can create the order. `superseded`: another tab/device replaced it. `expired`: the map clock ran out or it was released. `converted`: it already created its order (`orderId`)."
-          },
-          "seatsDeadline": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "orderId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Sale created with this session, if any."
-          }
-        },
-        "required": [
-          "id",
-          "state",
-          "seatsDeadline",
-          "orderId"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderCreateResult": {
-        "type": "object",
-        "properties": {
-          "free": {
-            "type": "boolean",
-            "description": "true = the purchase was CONFIRMED without a payment gateway (100% discount). In that case do NOT call /payment: there is nothing to charge and the other fields are null."
-          },
-          "reference": {
-            "type": "string",
-            "description": "Sale reference (FT-…). Always identifies the purchase."
-          },
-          "saleId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Sale id. null when `free` is true."
-          },
-          "total": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Amount to charge. null when `free` is true."
-          },
-          "currency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Instant (ISO 8601 UTC) at which the inventory reservation expires. After that, the purchase must be started over."
-          }
-        },
-        "required": [
-          "free",
-          "reference",
-          "saleId",
-          "total",
-          "currency",
-          "expiresAt"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderCurrent": {
-        "type": "object",
-        "properties": {
-          "order": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "saleId": {
-                    "type": "string"
-                  },
-                  "reference": {
-                    "type": "string"
-                  },
-                  "total": {
-                    "type": "number"
-                  },
-                  "currency": {
-                    "type": "string"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "description": "Instant (ISO 8601 UTC) at which the inventory hold expires. This is the countdown to display."
-                  },
-                  "paymentOpened": {
-                    "type": "boolean",
-                    "description": "true = payment has already been opened for this sale. Reopening it with /payment returns the SAME signed configuration while the reservation is still alive."
-                  },
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "ticketTypeId": {
-                          "type": "string"
-                        },
-                        "ticketTypeName": {
-                          "type": "string"
-                        },
-                        "quantity": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
-                        },
-                        "seatLabel": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "description": "seats.io numbered seat, or null if not seated."
-                        }
-                      },
-                      "required": [
-                        "ticketTypeId",
-                        "ticketTypeName",
-                        "quantity",
-                        "seatLabel"
-                      ],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": [
-                  "saleId",
-                  "reference",
-                  "total",
-                  "currency",
-                  "expiresAt",
-                  "paymentOpened",
-                  "items"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The purchase the buyer left unfinished for this event date, or null if there is none."
-          }
-        },
-        "required": [
-          "order"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderRelease": {
-        "type": "object",
-        "properties": {
-          "released": {
-            "type": "boolean",
-            "const": true,
-            "description": "The sale is now ABANDONED and its inventory went back to stock. A rejection never lands here: it is returned as an error with `details.reason`."
-          }
-        },
-        "required": [
-          "released"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderPayment": {
-        "type": "object",
-        "properties": {
-          "orderId": {
-            "type": "string",
-            "description": "Merchant reference = `reference`."
-          },
-          "amount": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Whole pesos, no decimals."
-          },
-          "currency": {
-            "type": "string"
-          },
-          "apiKey": {
-            "type": "string",
-            "description": "Bold IDENTITY key (public, sent to the browser)."
-          },
-          "integritySignature": {
-            "type": "string",
-            "description": "SHA256 that binds the charge to the amount. Computed on the server."
-          },
-          "renderMode": {
-            "type": "string",
-            "const": "embedded"
-          },
-          "redirectionUrl": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "expirationDate": {
-            "type": "number",
-            "description": "Epoch in NANOSECONDS (what the Bold library expects)."
-          }
-        },
-        "required": [
-          "orderId",
-          "amount",
-          "currency",
-          "apiKey",
-          "integritySignature",
-          "renderMode",
-          "redirectionUrl",
-          "description",
-          "expirationDate"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderMercadoPagoConfig": {
-        "type": "object",
-        "properties": {
-          "publicKey": {
-            "type": "string",
-            "description": "MercadoPago (Tickets) public key. Sent to the browser: it is what `initMercadoPago()`/`<Payment>` from the `@mercadopago/sdk-react` SDK (or equivalent) receives to mount the Payment Brick. Present ONLY on the MercadoPago rail — it is the marker the landing page uses to tell it apart from the Bold rail (which carries `apiKey`+`renderMode` and NEVER `publicKey`)."
-          },
-          "amount": {
-            "type": "number",
-            "description": "Amount to charge, in the currency's major unit (pesos, not cents) — the same `total` already returned by `POST /customer/orders`. It is re-read from the sale on every call: do not treat it as final if a long time passes between mounting the Brick and charging."
-          },
-          "currency": {
-            "type": "string"
-          },
-          "reference": {
-            "type": "string",
-            "description": "Sale reference (FT-…)."
-          },
-          "payerEmail": {
-            "type": "string",
-            "description": "Buyer email (from the sale, not editable). Informational: the charge ALWAYS uses the sale's email, never one sent by the client."
-          }
-        },
-        "required": [
-          "publicKey",
-          "amount",
-          "currency",
-          "reference",
-          "payerEmail"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderStartPayment": {
-        "anyOf": [
-          {
-            "$ref": "#/components/schemas/CustomerOrderPayment"
-          },
-          {
-            "$ref": "#/components/schemas/CustomerOrderMercadoPagoConfig"
-          }
-        ]
-      },
-      "CustomerOrderMercadoPagoChargeRequest": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Card token returned by the Payment Brick when tokenizing."
-          },
-          "paymentMethodId": {
-            "type": "string",
-            "minLength": 1,
-            "description": "`payment_method_id` returned by the Brick (e.g. `visa`, `debmaster`)."
-          },
-          "installments": {
-            "default": 1,
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "issuerId": {
-            "description": "`issuer_id` returned by the Brick. Some BINs require it.",
-            "type": "string"
-          },
-          "payer": {
-            "type": "object",
-            "properties": {
-              "email": {
-                "description": "Ignored: the charge ALWAYS uses the sale's email, never one sent by the client.",
-                "type": "string"
-              },
-              "identification": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string"
-                  },
-                  "number": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "number"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "token",
-          "paymentMethodId",
-          "installments"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderMercadoPagoChargeResult": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "approved",
-              "pending",
-              "rejected"
-            ],
-            "description": "`pending` is normal: it may require additional authentication from the bank. `rejected` is a business decline (funds, card details, …) — the buyer can retry with another card."
-          },
-          "reference": {
-            "type": "string"
-          },
-          "message": {
-            "description": "Human-readable message for the buyer. Only present with `rejected`.",
-            "type": "string"
-          },
-          "saleAlive": {
-            "description": "Only present with `rejected`. `false`: the purchase was cancelled and its tickets (and seats) went back to inventory — a new purchase must be started. `true`: THIS payment was declined but the purchase is still pending because another payment is in progress on it (e.g. a PSE payment waiting on the bank); do NOT start a new purchase: show the message, wait, and check the order status.",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "status",
-          "reference"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderMercadoPagoPse": {
-        "type": "object",
-        "properties": {
-          "redirectUrl": {
-            "type": "string",
-            "description": "`init_point` of the MercadoPago preference. Redirect the buyer there (it is not an iframe): they pick their bank and confirm the transfer on MercadoPago."
-          }
-        },
-        "required": [
-          "redirectUrl"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderStatus": {
-        "type": "object",
-        "properties": {
-          "reference": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "approved",
-              "pending",
-              "rejected"
-            ],
-            "description": "`pending` is a NORMAL state: Bold may take a while to reflect the payment (PSE, Nequi and the Bancolombia button approve asynchronously) and the webhook settles it. The landing page must retry, not treat the purchase as lost."
-          },
-          "saleStatus": {
-            "type": "string",
-            "description": "Internal sale status (PENDING, CONFIRMED, …)."
-          },
-          "total": {
-            "type": "number"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "tickets": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/CustomerTicketItem"
-                }
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Tickets with their `ticketCode`. ONLY present when `status` is `approved`; null in any other case. A code handed out before the payment settles would be a valid ticket with no money behind it."
-          }
-        },
-        "required": [
-          "reference",
-          "status",
-          "saleStatus",
-          "total",
-          "currency",
-          "tickets"
-        ],
         "additionalProperties": false
       },
       "ContentVideo": {
@@ -17448,134 +18027,126 @@
         ],
         "additionalProperties": false
       },
-      "ResendTicket": {
+      "WaitlistEntryCreate": {
         "type": "object",
         "properties": {
-          "ticketCode": {
-            "type": "string"
-          },
-          "sentTo": {
-            "type": "string"
-          },
-          "sentAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "ticketCode",
-          "sentTo",
-          "sentAt"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderItem": {
-        "type": "object",
-        "properties": {
-          "ticketTypeId": {
+          "city": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 60
           },
-          "quantity": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 30
-          },
-          "seats": {
-            "description": "seats.io labels. Only for seated events.",
-            "maxItems": 30,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          }
-        },
-        "required": [
-          "ticketTypeId",
-          "quantity"
-        ],
-        "additionalProperties": false
-      },
-      "CustomerOrderCreateRequest": {
-        "type": "object",
-        "properties": {
-          "eventDateId": {
+          "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 80
           },
-          "items": {
-            "minItems": 1,
-            "maxItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CustomerOrderItem"
-            }
-          },
-          "holdToken": {
-            "description": "Hold token of the seats.io map session. Required if seats are sent.",
+          "contact": {
             "type": "string",
+            "minLength": 1,
             "maxLength": 120
           },
-          "discountCode": {
+          "source": {
             "type": "string",
             "maxLength": 40
-          },
-          "buyer": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "minLength": 2,
-                "maxLength": 120
-              },
-              "phone": {
-                "type": "string",
-                "maxLength": 40
-              },
-              "idType": {
-                "type": "string",
-                "enum": [
-                  "CC",
-                  "CE",
-                  "NIT",
-                  "PP",
-                  "TI",
-                  "PEP"
-                ]
-              },
-              "idNumber": {
-                "type": "string",
-                "minLength": 5,
-                "maxLength": 20
-              },
-              "nitDigit": {
-                "description": "Check digit. Required if idType is NIT.",
-                "type": "string",
-                "maxLength": 1
-              }
-            },
-            "required": [
-              "name",
-              "phone",
-              "idType",
-              "idNumber"
-            ],
-            "additionalProperties": false
-          },
-          "returnUrl": {
-            "type": "string",
-            "maxLength": 2048,
-            "description": "Absolute URL of the landing page the buyer returns to. Validated against the enterprise domain allowlist and the workspace that owns the event; if it fails validation it is ignored and the purchase proceeds as usual."
           }
         },
         "required": [
-          "eventDateId",
-          "items",
-          "buyer",
-          "returnUrl"
+          "city",
+          "name",
+          "contact"
         ],
         "additionalProperties": false
+      },
+      "WaitlistEntryResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "city",
+          "created"
+        ],
+        "additionalProperties": false
+      },
+      "WaitlistEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "contact": {
+            "type": "string"
+          },
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "city",
+          "name",
+          "contact",
+          "customerId",
+          "source",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "headers": {
+      "RateLimitPolicy": {
+        "description": "Quota policies applied to this request (draft-ietf-httpapi-ratelimit-headers), one list member per limiter: `\"<policy>\";q=<quota>;w=<window seconds>`. Example: `\"public-orders\";q=8;w=300`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "RateLimit": {
+        "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers): `\"<policy>\";r=<remaining>;t=<seconds until the window resets>`. Example: `\"public-orders\";r=7;t=280`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "RetryAfter": {
+        "description": "Seconds to wait before retrying (RFC 9110 §10.2.3). Always sent with a 429.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "securitySchemes": {
