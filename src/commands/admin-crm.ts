@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import type { Command } from "commander";
+import { client as adminClient } from "../admin-client/client.gen";
 import {
   getCrmCampaigns,
   getCrmCampaignsId,
@@ -185,6 +186,62 @@ async function crmWriteOnce<T>(call: () => Promise<SdkResult<T>>): Promise<T> {
     );
   }
   return crmUnwrap(res, { write: true });
+}
+
+/**
+ * Host the admin client is pointed at (`admin.appfreeticket.com`, a staging
+ * host, localhost…). Named in every write confirmation so a staging token
+ * aimed at production — or the reverse — is visible before saying yes.
+ */
+export function apiHost(): string {
+  const base = adminClient.getConfig().baseUrl ?? "";
+  try {
+    return new URL(base).host || base;
+  } catch {
+    return base || "(unknown host)";
+  }
+}
+
+/** `confirmOrExit` for a CRM write, naming the API host it goes to. */
+function confirmCrmWrite(
+  action: string,
+  tail: string,
+  yes: boolean | undefined,
+): Promise<void> {
+  return confirmOrExit(
+    `${action} against ${apiHost()}?${tail ? ` ${tail}` : ""}`,
+    yes,
+  );
+}
+
+/**
+ * A write answered 2xx but the body is not the documented `{ data: … }`
+ * (a proxy page, an empty body, a contract drift). The backend most likely
+ * acted, so this must not crash or exit non-zero — either reads as "it failed,
+ * run it again", which is how a campaign goes out twice.
+ */
+export const UNEXPECTED_WRITE_RESPONSE_HINT =
+  "The server accepted the request (2xx) but answered in an unexpected shape. The write PROBABLY WENT THROUGH - do not run it again. Check `ft admin crm campaigns list` (or `campaigns get <id>`).";
+
+function writeData(body: unknown): unknown {
+  const data =
+    body && typeof body === "object"
+      ? (body as { data?: unknown }).data
+      : undefined;
+  if (data === undefined || data === null) {
+    console.error(chalk.yellow(`Warning: ${UNEXPECTED_WRITE_RESPONSE_HINT}`));
+    return undefined;
+  }
+  return data;
+}
+
+/** `--expect-count <N>`: a non-negative integer, or a hard stop. */
+export function parseExpectCount(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  const raw = String(value).trim();
+  if (!/^\d+$/.test(raw))
+    fail(`Invalid --expect-count: ${raw}. Use a whole number of people.`);
+  return Number(raw);
 }
 
 /**
@@ -383,14 +440,16 @@ export function registerAdminCrm(admin: Command): void {
     .action(async (id, opts) => {
       configureAdminClient();
       await showCampaign(id);
-      await confirmOrExit(
-        `Cancel campaign ${id}? It will not be sent`,
+      await confirmCrmWrite(
+        `Cancel campaign ${id}`,
+        "It will not be sent",
         opts.yes,
       );
       const body = await crmWriteOnce(() =>
         postCrmCampaignsIdCancel({ path: { id } }),
       );
-      print(body.data, { json: opts.json });
+      const data = writeData(body);
+      if (data !== undefined) print(data, { json: opts.json });
     });
 
   // ------------------------------------------------------------------ batches
@@ -407,8 +466,9 @@ export function registerAdminCrm(admin: Command): void {
     .action(async (id, opts) => {
       configureAdminClient();
       await showCampaign(id);
-      await confirmOrExit(
-        `Send the next batch of campaign ${id}${opts.ignoreWindow ? " (ignoring the send window)" : ""}?`,
+      await confirmCrmWrite(
+        `Send the next batch of campaign ${id}${opts.ignoreWindow ? " (ignoring the send window)" : ""}`,
+        "",
         opts.yes,
       );
       const body = await crmWriteOnce(() =>
@@ -417,7 +477,8 @@ export function registerAdminCrm(admin: Command): void {
           ...(opts.ignoreWindow ? { body: { ignoreSendWindow: true } } : {}),
         }),
       );
-      print(body.data, { json: opts.json });
+      const data = writeData(body);
+      if (data !== undefined) print(data, { json: opts.json });
     });
 
   batches
@@ -430,14 +491,16 @@ export function registerAdminCrm(admin: Command): void {
     .action(async (id, opts) => {
       configureAdminClient();
       await showCampaign(id);
-      await confirmOrExit(
-        `Stop campaign ${id}? Pending recipients will never be sent (irreversible)`,
+      await confirmCrmWrite(
+        `Stop campaign ${id}`,
+        "Pending recipients will never be sent (irreversible)",
         opts.yes,
       );
       const body = await crmWriteOnce(() =>
         postCrmCampaignsIdBatchesStop({ path: { id } }),
       );
-      print(body.data, { json: opts.json });
+      const data = writeData(body);
+      if (data !== undefined) print(data, { json: opts.json });
     });
 
   // ------------------------------------------------------------------- events
@@ -556,7 +619,11 @@ export function registerAdminCrm(admin: Command): void {
       "--ignore-window",
       "WhatsApp with timing.mode now: send even outside the 9:00-20:00 Bogotá window",
     )
-    .option("--yes", "skip confirmation")
+    .option(
+      "--expect-count <n>",
+      "people you expect to reach (the N of `Launch to N people`); the launch stops if the preview differs. Required with --yes",
+    )
+    .option("--yes", "skip confirmation (requires --expect-count)")
     .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureAdminClient();
@@ -570,6 +637,14 @@ export function registerAdminCrm(admin: Command): void {
           "See the `ft admin crm` section of the README for a campaign.json example.",
         );
       parseFilter(input.filter, "--data.filter");
+      const expected = parseExpectCount(opts.expectCount);
+      // --yes skips the human; then the caller must state the reach up front,
+      // so a script or an agent cannot launch to an audience it never sized.
+      if (opts.yes && expected === undefined)
+        fail(
+          "Refusing: launch --yes needs --expect-count <N> (the number of people you expect to reach). Nothing was sent.",
+          "Size the audience first with `ft admin crm preview --filter …` (reachable by WhatsApp for WHATSAPP, the total for EMAIL), then pass that number.",
+        );
       // Same filter and sender the launch will use: what you confirm is what
       // the backend resolves.
       const preview = crmUnwrap(
@@ -598,17 +673,30 @@ export function registerAdminCrm(admin: Command): void {
           : input.timing?.mode === "batches"
             ? "in batches"
             : "on schedule";
-      await confirmOrExit(
-        `Launch to ${reach} people by ${input.channel ?? "?"}, sending ${when}${input.ignoreSendWindow ? " (ignoring the send window)" : ""}?`,
+      if (expected !== undefined && expected !== reach)
+        fail(
+          `Refusing: the preview reaches ${reach} people, --expect-count says ${expected}. Nothing was sent.`,
+          "The audience changed or the filter is not the one you sized. Check it with `ft admin crm preview` and pass the number you mean to reach.",
+        );
+      await confirmCrmWrite(
+        `Launch to ${reach} people by ${input.channel ?? "?"}, sending ${when}${input.ignoreSendWindow ? " (ignoring the send window)" : ""}`,
+        "",
         opts.yes,
       );
       const body = await crmWriteOnce(() => postCrmCampaigns({ body: input }));
-      print(body.data, { json: opts.json });
+      const data = writeData(body);
+      if (data === undefined) return;
+      print(data, { json: opts.json });
+      const id = (data as { id?: unknown }).id;
+      if (typeof id !== "string" || !id) {
+        console.error(
+          chalk.yellow(`Warning: ${UNEXPECTED_WRITE_RESPONSE_HINT}`),
+        );
+        return;
+      }
       if (!opts.json)
         console.error(
-          chalk.dim(
-            `\nFollow it with \`ft admin crm campaigns get ${body.data.id}\``,
-          ),
+          chalk.dim(`\nFollow it with \`ft admin crm campaigns get ${id}\``),
         );
     });
 }

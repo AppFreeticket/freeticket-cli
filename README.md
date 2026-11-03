@@ -162,19 +162,31 @@ ft admin crm events dates <eventId...>
 ft admin crm options
 ft admin crm quota
 ft admin crm preview --filter @filter.json [--sender freeticket|<workspaceId>]
-ft admin crm launch --data @campaign.json [--ignore-window] [--yes]
+ft admin crm launch --data @campaign.json [--ignore-window] [--expect-count N] [--yes]
 ```
 
 **Writes send real messages.** `launch`, `campaigns cancel`, `batches next` and
 `batches stop` first show what they are about to touch — `launch` runs the
 audience preview with the same filter and sender (total, how many have email
 or reachable WhatsApp, the estimated days at the daily quota); the others show
-the campaign — and then ask for confirmation. Without a TTY they refuse unless
-you pass `--yes` (being in CI is not consent). The CLI never retries a write
+the campaign — and then ask for confirmation, naming the API host the write
+goes to (`… against admin.appfreeticket.com?`) so a staging token pointed at
+production stands out. Without a TTY they refuse unless you pass `--yes`
+(being in CI is not consent).
+
+`launch --yes` also requires `--expect-count <N>`: the number of people you
+expect to reach — reachable by WhatsApp for a `WHATSAPP` campaign, the total
+for `EMAIL`, the same `N` the prompt shows in `Launch to N people`. Take it from
+`ft admin crm preview`. If the launch's own preview gives a different number it
+stops before sending anything. Without `--yes` the flag is optional (the prompt
+is the gate) but still checked when given. A script or an agent cannot launch
+a campaign without declaring how many people it reaches. The CLI never retries a write
 on its own: a 5xx or a dropped connection on a write is reported as "outcome
 unknown" — check `campaigns list` before running it again (the backend rejects
 the same channel + sender + subject within 10 minutes with
-`DUPLICATE_CAMPAIGN` and prints the existing id). A filter without
+`DUPLICATE_CAMPAIGN` and prints the existing id). If a write answers 2xx but
+with an unexpected body, the CLI exits 0 with a warning that it probably went
+through — again, check `campaigns list` instead of running it again. A filter without
 `"version": 2` is refused before anything is sent.
 
 Named errors get a next step: `OUTSIDE_SEND_WINDOW` (WhatsApp sends only

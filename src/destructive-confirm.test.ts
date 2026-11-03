@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   afterEach,
   beforeEach,
@@ -229,6 +230,7 @@ describe("ft admin crm writes refuse without a TTY and without --yes", () => {
 const CRM_WRITES = [
   {
     name: "launch",
+    op: "postCrmCampaigns",
     args: [
       "launch",
       "--data",
@@ -241,21 +243,27 @@ const CRM_WRITES = [
         filter: { version: 2, include: [], except: [] },
         timing: { mode: "now" },
       }),
+      // WhatsApp reach of PREVIEW. Required with --yes, checked without it.
+      "--expect-count",
+      "7",
     ],
     write: sdk.postCrmCampaigns,
   },
   {
     name: "campaigns cancel",
+    op: "postCrmCampaignsIdCancel",
     args: ["campaigns", "cancel", "cmp_1"],
     write: sdk.postCrmCampaignsIdCancel,
   },
   {
     name: "batches next",
+    op: "postCrmCampaignsIdBatchesNext",
     args: ["batches", "next", "cmp_1"],
     write: sdk.postCrmCampaignsIdBatchesNext,
   },
   {
     name: "batches stop",
+    op: "postCrmCampaignsIdBatchesStop",
     args: ["batches", "stop", "cmp_1"],
     write: sdk.postCrmCampaignsIdBatchesStop,
   },
@@ -309,12 +317,13 @@ describe("ft admin crm writes: confirmation, preview and no retries", () => {
     program.parseAsync(["node", "ft", "admin", "crm", ...args, ...extra]);
 
   it.each(
-    CRM_WRITES,
-  )("$name asks on a TTY and an answer other than yes never sends", async ({
+    CRM_WRITES.flatMap((w) => ["", "n"].map((answer) => ({ ...w, answer }))),
+  )("$name asks on a TTY and the answer $answer never sends", async ({
     args,
     write,
+    answer,
   }) => {
-    tty.answer = "";
+    tty.answer = answer;
     await expect(run(args)).rejects.toThrow("exited");
     expect(tty.questions).toHaveLength(1);
     expect(tty.questions[0]).toMatch(/\[y\/N\] $/);
@@ -440,4 +449,262 @@ describe("ft admin crm writes: confirmation, preview and no retries", () => {
       expect(err).toContain("may or may not have gone through");
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// No CRM write may slip past the gate: the contract's own markers and the
+// source of the command are both swept, so a new write (or a refactor that
+// calls the SDK directly) fails here instead of shipping unconfirmed.
+
+describe("every CRM write the admin contract flags is covered by the gate tests", () => {
+  type Op = {
+    operationId?: string;
+    "x-ft-destructive"?: unknown;
+    "x-ft-mcp"?: { expose?: boolean };
+  };
+  const spec = JSON.parse(
+    readFileSync(new URL("../admin-openapi.json", import.meta.url), "utf8"),
+  ) as { paths: Record<string, Record<string, Op>> };
+  const flagged = Object.values(spec.paths)
+    .flatMap((ops) => Object.values(ops))
+    .filter(
+      (op) =>
+        op &&
+        typeof op === "object" &&
+        (op["x-ft-destructive"] !== undefined ||
+          op["x-ft-mcp"]?.expose === false),
+    )
+    .map((op) => op.operationId);
+
+  it("finds the flagged operations (the sweep is not vacuous)", () => {
+    expect(flagged.length).toBeGreaterThanOrEqual(4);
+    expect(flagged.every((id) => typeof id === "string")).toBe(true);
+  });
+
+  it.each(flagged)("%s is in CRM_WRITES", (id) => {
+    expect(CRM_WRITES.map((w) => w.op)).toContain(id);
+  });
+
+  it.each(CRM_WRITES)("CRM_WRITES $name mocks the SDK function $op", ({
+    op,
+    write,
+  }) => {
+    expect(write).toBe(sdk[op]);
+  });
+});
+
+describe("admin-crm.ts calls every CRM write SDK function only through crmWriteOnce", () => {
+  const source = readFileSync(
+    new URL("./commands/admin-crm.ts", import.meta.url),
+    "utf8",
+  );
+  // Everything after the last import statement: any mention there is a use.
+  const imports = [...source.matchAll(/^import [^;]*;$/gm)];
+  const last = imports.at(-1);
+  const body = source.slice((last?.index ?? 0) + (last?.[0].length ?? 0));
+  const uses = [...body.matchAll(/\bpostCrm\w+/g)].filter(
+    (m) => m[0] !== "postCrmAudiencePreview",
+  );
+
+  it("uses each of the four writes", () => {
+    expect(new Set(uses.map((m) => m[0]))).toEqual(
+      new Set(CRM_WRITES.map((w) => w.op)),
+    );
+  });
+
+  it.each(
+    uses.map((m) => [m[0], m.index ?? 0] as const),
+  )("%s (offset %i) is a call wrapped in crmWriteOnce(() =>", (name, at) => {
+    const before = body.slice(0, at);
+    const after = body.slice(at + name.length);
+    expect(before).toMatch(/crmWriteOnce\(\(\)\s*=>\s*$/);
+    expect(after).toMatch(/^\(/);
+  });
+});
+
+/** TTY + credential + mocked reads, shared by the CRM blocks below. */
+function crmHarness() {
+  const state = {
+    stderr: [] as string[],
+    stdout: "",
+    exit: undefined as unknown as MockInstance<typeof process.exit>,
+  };
+  const isTTY = process.stdin.isTTY;
+  const env = { ...process.env };
+  beforeEach(() => {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      configurable: true,
+    });
+    process.env.FT_ADMIN_TOKEN = "ftpat_test";
+    tty.answer = "n";
+    tty.questions = [];
+    tty.onAsk = undefined;
+    state.stderr = [];
+    state.stdout = "";
+    sdk.postCrmAudiencePreview.mockResolvedValue({
+      data: { data: PREVIEW },
+      response: new Response(),
+    });
+    sdk.getCrmCampaignsId.mockResolvedValue({
+      data: { data: CAMPAIGN },
+      response: new Response(),
+    });
+    vi.spyOn(console, "error").mockImplementation((...a) => {
+      state.stderr.push(a.join(" "));
+    });
+    vi.spyOn(console, "log").mockImplementation((...a) => {
+      state.stdout += `${a.join(" ")}\n`;
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      state.stdout += String(chunk);
+      return true;
+    });
+    state.exit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exited");
+    }) as never);
+  });
+  afterEach(() => {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: isTTY,
+      configurable: true,
+    });
+    process.env = { ...env };
+    vi.restoreAllMocks();
+    for (const fn of Object.values(sdk)) fn.mockReset();
+  });
+  const run = (args: readonly string[], ...extra: string[]) =>
+    program.parseAsync(["node", "ft", "admin", "crm", ...args, ...extra]);
+  return { state, run };
+}
+
+describe("ft admin crm launch --expect-count", () => {
+  const { state, run } = crmHarness();
+  // CRM_WRITES[0].args without its `--expect-count 7`.
+  const launchArgs = CRM_WRITES[0].args.slice(0, 3);
+  const created = () =>
+    sdk.postCrmCampaigns.mockResolvedValue({
+      data: { data: { id: "cmp_9", status: "APPROVED" } },
+      response: new Response(),
+    });
+
+  it("--yes without --expect-count exits 1 and never writes", async () => {
+    created();
+    await expect(run(launchArgs, "--yes")).rejects.toThrow("exited");
+    expect(state.exit).toHaveBeenCalledWith(1);
+    expect(state.stderr.join("\n")).toMatch(/--expect-count/);
+    expect(sdk.postCrmCampaigns).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["with --yes", "10"], // the total, but WhatsApp reaches 7
+    ["with --yes", "8"],
+    ["without --yes", "3"], // optional there, but enforced when given
+  ])("%s with a count that does not match the preview (%s) exits 1 and never writes", async (yes, count) => {
+    created();
+    tty.answer = "y";
+    await expect(
+      run(
+        launchArgs,
+        "--expect-count",
+        count,
+        ...(yes === "with --yes" ? ["--yes"] : []),
+      ),
+    ).rejects.toThrow("exited");
+    expect(state.exit).toHaveBeenCalledWith(1);
+    expect(sdk.postCrmAudiencePreview).toHaveBeenCalledTimes(1);
+    expect(state.stderr.join("\n")).toContain(
+      `the preview reaches 7 people, --expect-count says ${count}`,
+    );
+    expect(tty.questions).toHaveLength(0);
+    expect(sdk.postCrmCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("--yes with a matching count writes exactly once", async () => {
+    created();
+    await run(launchArgs, "--expect-count", "7", "--yes", "--json");
+    expect(state.exit).not.toHaveBeenCalled();
+    expect(sdk.postCrmCampaigns).toHaveBeenCalledTimes(1);
+  });
+
+  it("without --yes, --expect-count is optional (the prompt is the gate)", async () => {
+    created();
+    tty.answer = "y";
+    await run(launchArgs, "--json");
+    expect(tty.questions).toHaveLength(1);
+    expect(sdk.postCrmCampaigns).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    "-1",
+    "abc",
+    "7.5",
+    "",
+  ])("rejects --expect-count %j before any request", async (count) => {
+    await expect(
+      run(launchArgs, `--expect-count=${count}`, "--yes"),
+    ).rejects.toThrow("exited");
+    expect(state.exit).toHaveBeenCalledWith(1);
+    expect(state.stderr.join("\n")).toContain("Invalid --expect-count");
+    expect(sdk.postCrmAudiencePreview).not.toHaveBeenCalled();
+    expect(sdk.postCrmCampaigns).not.toHaveBeenCalled();
+  });
+});
+
+describe("ft admin crm writes name the API host in the confirmation", () => {
+  const { run } = crmHarness();
+
+  it.each(CRM_WRITES)("$name asks against the configured host", async ({
+    args,
+    write,
+  }) => {
+    process.env.FT_API_URL = "https://staging.freeticket.test";
+    await expect(run(args)).rejects.toThrow("exited");
+    expect(tty.questions).toHaveLength(1);
+    expect(tty.questions[0]).toContain("against staging.freeticket.test");
+    expect(write).not.toHaveBeenCalled();
+  });
+});
+
+describe("ft admin crm writes on a 2xx with an unexpected body", () => {
+  const { state, run } = crmHarness();
+  const odd = [
+    ["an empty object", {}],
+    ["null", null],
+    ["a string", "Created"],
+    ["data: null", { data: null }],
+    ["data without an id", { data: { status: "APPROVED" } }],
+  ] as const;
+
+  it.each(
+    odd,
+  )("launch on %s does not crash, exits 0 and says it probably went through", async (_label, body) => {
+    sdk.postCrmCampaigns.mockResolvedValue({
+      data: body,
+      response: new Response(null, { status: 201 }),
+    });
+    await expect(run(CRM_WRITES[0].args, "--yes")).resolves.toBeDefined();
+    expect(state.exit).not.toHaveBeenCalled();
+    expect(sdk.postCrmCampaigns).toHaveBeenCalledTimes(1);
+    const err = state.stderr.join("\n");
+    expect(err).toContain("PROBABLY WENT THROUGH");
+    expect(err).toContain("ft admin crm campaigns list");
+    expect(err).not.toContain("campaigns get undefined");
+  });
+
+  it.each(
+    CRM_WRITES.slice(1),
+  )("$name on a null body does not crash and says it probably went through", async ({
+    args,
+    write,
+  }) => {
+    write.mockResolvedValue({
+      data: null,
+      response: new Response(null, { status: 200 }),
+    });
+    await expect(run(args, "--yes")).resolves.toBeDefined();
+    expect(state.exit).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(state.stderr.join("\n")).toContain("PROBABLY WENT THROUGH");
+  });
 });

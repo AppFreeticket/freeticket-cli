@@ -246,7 +246,15 @@ describe("ft admin crm commands", () => {
       },
       timing: { mode: "now" },
     };
-    await run("launch", "--data", JSON.stringify(input), "--yes", "--json");
+    await run(
+      "launch",
+      "--data",
+      JSON.stringify(input),
+      "--expect-count",
+      "80",
+      "--yes",
+      "--json",
+    );
     expect(sdk.postCrmAudiencePreview).toHaveBeenCalledWith({
       body: { filter: input.filter, sender: input.sender },
     });
@@ -271,6 +279,8 @@ describe("ft admin crm commands", () => {
         "launch",
         "--data",
         JSON.stringify({ filter: { version: 2 } }),
+        "--expect-count",
+        "0",
         "--yes",
       ),
     ).rejects.toThrow("exited");
@@ -291,6 +301,8 @@ describe("ft admin crm commands", () => {
         "launch",
         "--data",
         JSON.stringify({ filter: { version: 2 }, channel: "EMAIL" }),
+        "--expect-count",
+        "110",
         "--yes",
       ),
     ).rejects.toThrow("exited");
@@ -321,6 +333,8 @@ describe("ft admin crm commands", () => {
       "--data",
       JSON.stringify(nowInput),
       "--ignore-window",
+      "--expect-count",
+      "80",
       "--yes",
       "--json",
     );
@@ -334,7 +348,15 @@ describe("ft admin crm commands", () => {
     sdk.postCrmCampaigns.mockResolvedValue(
       ok({ id: "cmp_9", status: "APPROVED", scheduledAt: null }),
     );
-    await run("launch", "--data", JSON.stringify(nowInput), "--yes", "--json");
+    await run(
+      "launch",
+      "--data",
+      JSON.stringify(nowInput),
+      "--expect-count",
+      "80",
+      "--yes",
+      "--json",
+    );
     expect(sdk.postCrmCampaigns.mock.calls[0]?.[0].body).not.toHaveProperty(
       "ignoreSendWindow",
     );
@@ -354,7 +376,14 @@ describe("ft admin crm commands", () => {
       ),
     );
     await expect(
-      run("launch", "--data", JSON.stringify(nowInput), "--yes"),
+      run(
+        "launch",
+        "--data",
+        JSON.stringify(nowInput),
+        "--expect-count",
+        "80",
+        "--yes",
+      ),
     ).rejects.toThrow("exited");
     expect(sdk.postCrmCampaigns).toHaveBeenCalledTimes(1);
     const err = stderr.join("\n");
@@ -386,7 +415,14 @@ describe("ft admin crm commands", () => {
       response: new Response(null, { status: 413 }),
     });
     await expect(
-      run("launch", "--data", JSON.stringify(nowInput), "--yes"),
+      run(
+        "launch",
+        "--data",
+        JSON.stringify(nowInput),
+        "--expect-count",
+        "80",
+        "--yes",
+      ),
     ).rejects.toThrow("exited");
     expect(exit).toHaveBeenCalledWith(1);
     const err = stderr.join("\n");
@@ -458,6 +494,8 @@ describe("ft admin crm commands", () => {
       "launch",
       "--data",
       JSON.stringify({ channel: "EMAIL", filter: { version: 1 } }),
+      "--expect-count",
+      "1",
       "--yes",
     ],
   ])("a filter that is not v2 stops before any request: %j", async (...args) => {
