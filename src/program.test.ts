@@ -47,6 +47,24 @@ test("contract 1.19 / admin 1.5 commands are wired, destructive ones behind --ye
   expect(longs("admin workspaces plan")).toContain("--data");
 });
 
+test("admin 1.8 CRM commands are wired under `ft admin crm`", () => {
+  const tree = new Map(walk(program));
+  const expected = [
+    "admin crm campaigns list",
+    "admin crm campaigns get",
+    "admin crm campaigns cancel",
+    "admin crm batches next",
+    "admin crm batches stop",
+    "admin crm events search",
+    "admin crm events dates",
+    "admin crm options",
+    "admin crm quota",
+    "admin crm preview",
+    "admin crm launch",
+  ];
+  expect(expected.filter((p) => !tree.has(p))).toEqual([]);
+});
+
 test("contract 1.24: waitlist list/create are wired, list filters by --city", () => {
   const tree = new Map(walk(program));
   expect(tree.has("waitlist list")).toBe(true);
