@@ -100,8 +100,13 @@ ft sales list --status CONFIRMED --json
 | `ft events artists remove <eventId> <organizationId>` | Unlink one artist (`--yes` skips the prompt) | ADMIN |
 | `ft events invitations list <eventId>` · `resend <eventId> <invitationId>` · `cancel <eventId> <invitationId>` | Invitations sent to artists without an account: list, resend (renews 14 days, sends an email) and cancel (`--yes`) | ADMIN |
 | `ft events schedule set <eventId> --publish-at <iso>` \| `--sale-starts-at <iso>` · `schedule clear <eventId>` | Schedule a DRAFT: publish later, or publish now and open sales later (exactly one flag) · cancel a pending `--publish-at` | ADMIN |
+| `ft events viewers list <eventId>` · `add <eventId> --email <e>` · `remove <eventId> <viewerId>` | Read-only viewers of an event's stats; `add` emails the link (and creates a VIEWER account if needed), both `add` and `remove` ask (`--yes`) | ADMIN |
+| `ft events validators list <eventId>` · `add <eventId> --name <n> --email <e>` | Door staff of an event (additive; a new account gets an invitation email, so `add` asks, `--yes`) | ADMIN |
 | `ft event-dates list` · `create` · `update` · `delete` | Event dates | ADMIN |
 | `ft event-dates courtesy-seats <dateId>` | Blocked seats of a numbered date that can be issued as courtesies | ADMIN |
+| `ft event-dates access-close status <dateId>` · `sign <dateId>` | Live entry count · sign the access-close record (freezes the count and emails it; IRREVERSIBLE, `--yes`) | STAFF · ADMIN |
+| `ft ticket-templates list` · `create` · `update <id>` · `delete <id>` · `instantiate <id> --event-date <id> [--name --price --capacity]` | Reusable ticket type templates; `instantiate` creates a ticket type on a date (`delete` asks, `--yes`) | ADMIN |
+| `ft master-qrs list [--full]` · `create` · `update <id>` · `activate <id>` · `deactivate <id>` · `delete <id>` | Master box-office QRs (`code`/`url` are secret: the table hides them unless `--full`; `delete` asks, `--yes`) | ADMIN |
 | `ft ticket-types list` · `get <id>` | Ticket types (`--event-date-id`) | VIEWER |
 | `ft ticket-types create` · `update <id>` · `delete <id>` | Manage ticket types (`--data <json>`) | ADMIN |
 | `ft presale-windows list <ticketTypeId>` · `create <ticketTypeId> --plan --starts-at --ends-at [--capacity --active]` · `update <id>` · `delete <id>` | Membership presale windows (alias `presales`; one per plan; `delete` asks, `--yes` skips) | ADMIN |
@@ -111,6 +116,8 @@ ft sales list --status CONFIRMED --json
 | `ft sales tickets <id>` · `attempts <id>` | Tickets/attendees of a sale · its payment attempt history (why it did not go through) | STAFF |
 | `ft sales transfer <saleId> <itemId> --email <email>` | Transfer one ticket to a registered buyer; voids the old QR, once per ticket (`--yes`) | ADMIN |
 | `ft sales recipient set <saleId> --name <name> --email <email>` | Correct a courtesy's recipient and resend (a new email voids the old QRs; `--yes`) | ADMIN |
+| `ft sales abandon <id>` | Mark a PENDING sale whose payment never started as abandoned; releases its stock (terminal, `--yes`) | ADMIN |
+| `ft sales intents --event <id> [--event-date --only-abandoned --limit --cursor]` | Purchase intents: checkout funnel and abandoned journeys (personal data) | VIEWER |
 | `ft tickets access <code>` | Read a ticket's access status (no admit) | STAFF |
 | `ft tickets checkin <code>` | Admit a ticket at the door (idempotent) | STAFF |
 | `ft tickets checkin-undo <code>` | Undo a check-in so the ticket is valid again (idempotent; `--yes`) | ADMIN |
@@ -125,12 +132,24 @@ ft sales list --status CONFIRMED --json
 | `ft venues list` · `get <id>` | Venues | VIEWER |
 | `ft venues create` · `update <id>` · `delete <id>` | Manage venues (`--data <json>`) | ADMIN |
 | `ft staff list` · `get <id>` · `create` · `set-role <id>` · `delete <id>` | Workspace staff (`--workspace-ids <ids>` lists up to 25 workspaces in one call; `--data <json>`) | ADMIN |
+| `ft staff access <id> --type admin\|validador\|personalizado\|lectura [--sections --validator-events --viewer-events --expires-at]` | FULL replace of a member's access in this workspace (or `--data`; asks, `--yes`) | ADMIN |
+| `ft staff resend-invite <id>` | Email the invitation link again (asks, `--yes`) | ADMIN |
 | `ft reports summary` | KPIs (`--period 7d\|30d\|90d\|1y`) | VIEWER |
 | `ft reports by-event` · `timeseries` · `inventory` | Revenue/tickets by event, over time, and capacity/availability | VIEWER |
 | `ft reports export buyers\|attendees\|subscribers\|reconciliation` | Exports as CSV (filters `--event` `--event-date` `--from` `--to` `--status`) | ADMIN |
 | `ft reports reconciliation` · `financials` | CFO reconciliation (Mercado Pago vs sale vs Siigo invoice) · per-function P&L | ADMIN |
+| `ft reports live-attendance [--scope all\|own\|partner:<orgId>]` | Event dates happening right now, with check-in progress | VIEWER |
 | `ft settlements list` · `get <id>` · `document <id>` | Settlements paid to the organizer · signed download URL for the PDF, 5 min TTL (`--proof <fileName>` for a payment proof) | ADMIN |
 | `ft content-videos list` · `content-posts list\|create` · `content-lives list\|get\|playback-token` | Organization content; `content-posts create --data` publishes a post or article | ADMIN |
+| `ft content-posts update <id>` · `delete <id>` · `pin <id>` · `unpin <id>` | Edit, delete (`--yes`) and pin community posts | ADMIN |
+| `ft content-videos update <id>` · `delete <id>` · `publish <id>` · `unpublish <id>` · `set-series <id> --series <id\|none>` · `ft content-series list\|create\|update\|delete\|publish\|unpublish` | On-demand videos and video series (deletes ask, `--yes`) | ADMIN |
+| `ft content-lives create` · `update <id>` · `delete <id>` · `chat <id>` · `reset-key <id>` | Live streams: `create` and `reset-key` print the SECRET stream key once; `delete` and `reset-key` ask (`--yes`) | ADMIN |
+| `ft content-channels list` · `create` · `update <id>` · `order <id,id,…>` · `archive <id>` | Community channels (`archive` has no undo, `--yes`) | ADMIN |
+| `ft content-meetups list` · `get` · `create` · `update` · `publish <id>` · `cancel <id>` · `rsvp <id> <rsvpId> --approve\|--reject` · `attendance <id> <rsvpId>` | Community meetups; `publish`, `cancel` and `rsvp` notify members, so they ask (`--yes`) | ADMIN |
+| `ft content-moderation queue\|bans\|member-posts` · `approve <postId> --expected-updated-at <iso>` · `reject <postId>` · `remove <postId>` · `ft content-comments hide\|unhide\|ignore-reports\|delete <id>` · `ft content-members ban <customerId> --comment <id>` · `unban <customerId>` | Community moderation (`reject`, `remove`, `delete` and `ban` ask, `--yes`) | STAFF · ADMIN |
+| `ft products list` · `get` · `create` · `update` · `delete` · `status <id> --status DRAFT\|PUBLISHED` | Digital products and courses (`--data <json>`; `delete` asks) | ADMIN |
+| `ft organization update --data` · `analytics <G-XXXX\|none>` · `profile get\|update` · `ft website get\|set --data\|publish\|unpublish` | Workspace identity, profile, GA4 and public website (`website set` is a FULL replace: start from `website get --json`) | ADMIN |
+| `ft merch catalog` | Merch store settings and published products with live stock (needs an enterprise service key) | — |
 | `ft waitlist list [--city <name>]` · `waitlist create --data` | Per-city waitlist of an enterprise landing (export with personal data); `create` needs an enterprise service key | ADMIN |
 | `ft api-keys create <name>` · `list` · `revoke <id>` | Self-service API keys (the secret is shown once, never stored) | ADMIN |
 | `ft admin login` · `me` · `workspaces` · `users` · `plans` · `feature-flags` · `tokens` · `audit-log` | Superadmin, cross-tenant — needs a SUPER_ADMIN session, not an API key. Includes `admin workspaces plan <id>` (assisted plan assignment), `plan-show <id>` (current plan) and `delete <id>` (soft delete; suspend first) and `webTemplate` / `customDomain` on `update` | SUPER_ADMIN |

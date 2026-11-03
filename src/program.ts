@@ -2,17 +2,26 @@ import { Command } from "commander";
 // Version synced with package.json at build time (tsup injects it via import).
 import pkg from "../package.json" with { type: "json" };
 import {
+  deleteContentLivesId,
+  deleteContentPostsId,
+  deleteContentSeriesId,
+  deleteContentVideosId,
   deleteDiscountsId,
   deleteEventsId,
   deleteEventsIdDatesDateId,
+  deleteMasterQrsId,
   deleteMembershipPlansId,
+  deleteProductsId,
   deleteStaffId,
+  deleteTicketTemplatesId,
   deleteTicketTypesId,
   deleteVenuesId,
   deleteWebhooksId,
   getContentLives,
   getContentLivesId,
+  getContentMeetupsId,
   getContentPosts,
+  getContentSeries,
   getContentVideos,
   getDiscounts,
   getEvents,
@@ -21,6 +30,7 @@ import {
   getMembershipPlans,
   getMembershipPlansId,
   getMembershipPlansIdSubscribers,
+  getProductsId,
   getSales,
   getSalesId,
   getSalesIdAttempts,
@@ -35,27 +45,46 @@ import {
   getVenuesId,
   getWaitlist,
   getWebhooks,
+  patchContentChannelsId,
+  patchContentLivesId,
+  patchContentMeetupsId,
+  patchContentPostsId,
+  patchContentSeriesId,
+  patchContentVideosId,
   patchDiscountsId,
   patchEventsId,
   patchEventsIdDatesDateId,
+  patchMasterQrsId,
   patchMembershipPlansId,
+  patchProductsId,
   patchStaffIdRole,
+  patchTicketTemplatesId,
   patchTicketTypesId,
   patchVenuesId,
   patchWebhooksId,
+  postContentChannels,
+  postContentChannelsIdArchive,
+  postContentLives,
+  postContentMeetups,
+  postContentMeetupsIdCancel,
   postContentPlaybackToken,
   postContentPosts,
+  postContentSeries,
   postDiscounts,
   postEvents,
   postEventsIdCancel,
   postEventsIdDates,
   postEventsIdPublish,
+  postMasterQrs,
   postMembershipPlans,
+  postProducts,
   postSales,
+  postSalesIdAbandon,
   postSalesIdCancel,
   postSalesIdRefund,
   postStaff,
   postSubscriptionsIdCancel,
+  postTicketTemplates,
   postTicketTypes,
   postVenues,
   postWaitlist,
@@ -65,6 +94,24 @@ import { registerAccount } from "./commands/account";
 import { registerAdmin } from "./commands/admin";
 import { registerApiKeys } from "./commands/api-keys";
 import { registerAuth } from "./commands/auth";
+import {
+  extendMasterQrs,
+  extendTicketTemplates,
+  registerAccessClose,
+  registerEventAccess,
+  registerLiveAttendance,
+  registerPaymentIntents,
+  registerStaffAccess,
+} from "./commands/box-office";
+import {
+  extendContentChannels,
+  extendContentLives,
+  extendContentMeetups,
+  extendContentPosts,
+  extendContentSeries,
+  extendContentVideos,
+  registerModeration,
+} from "./commands/community";
 import { registerEventDates } from "./commands/event-dates";
 import { registerArtists, registerEventLineup } from "./commands/lineup";
 import {
@@ -76,6 +123,12 @@ import {
 } from "./commands/ops";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
+import {
+  extendProducts,
+  registerMerch,
+  registerOrganization,
+  registerWebsite,
+} from "./commands/storefront";
 import { registerTickets } from "./commands/tickets";
 import { registerWorkspace } from "./commands/workspace";
 import {
@@ -143,6 +196,7 @@ registerResource(program, {
   extend: (root) => {
     registerEventLineup(root);
     registerEventSchedule(root);
+    registerEventAccess(root);
   },
 });
 
@@ -226,6 +280,15 @@ registerResource(program, {
         "Payment attempt history of a sale (declines, approvals, refunds)",
       fn: getSalesIdAttempts,
     },
+    {
+      // PENDING sale whose payment never started -> ABANDONED (terminal); its
+      // stock goes back on sale. Confirmed sales use `cancel` (contract 1.30).
+      name: "abandon",
+      describe:
+        "Mark a pending sale as abandoned and release its stock (terminal)",
+      fn: postSalesIdAbandon,
+      confirm: true,
+    },
   ],
   columns: ["id", "reference", "status", "total", "currency", "createdAt"],
   listFlags: [
@@ -258,7 +321,10 @@ registerResource(program, {
     },
     { flag: "--to <date>", describe: "created to (ISO 8601)", query: "to" },
   ],
-  extend: registerSaleOps,
+  extend: (root) => {
+    registerSaleOps(root);
+    registerPaymentIntents(root);
+  },
 });
 
 registerResource(program, {
@@ -367,6 +433,7 @@ registerResource(program, {
     },
   ],
   columns: ["id", "name", "email", "role", "workspaceName"],
+  extend: registerStaffAccess,
   listFlags: [
     {
       flag: "--workspace-ids <ids>",
@@ -386,7 +453,22 @@ registerResource(program, {
   name: "content-videos",
   describe: "Organization videos",
   list: getContentVideos,
+  update: patchContentVideosId,
+  del: deleteContentVideosId,
   columns: ["id", "title", "publishedAt", "memberOnly"],
+  extend: extendContentVideos,
+});
+
+registerResource(program, {
+  name: "content-series",
+  describe: "Video series",
+  list: getContentSeries,
+  create: postContentSeries,
+  update: patchContentSeriesId,
+  // Deleting a series keeps its videos (they move out of it).
+  del: deleteContentSeriesId,
+  columns: ["id", "title", "published", "videoCount", "memberOnly"],
+  extend: extendContentSeries,
 });
 
 registerResource(program, {
@@ -396,7 +478,10 @@ registerResource(program, {
   // type=ARTICLE needs title + body (Markdown); TEXT/IMAGE need content or
   // imageUrl. Minimum role ADMIN (contract 1.19).
   create: postContentPosts,
+  update: patchContentPostsId,
+  del: deleteContentPostsId,
   columns: ["id", "title", "publishedAt", "memberOnly"],
+  extend: extendContentPosts,
 });
 
 registerResource(program, {
@@ -404,8 +489,13 @@ registerResource(program, {
   describe: "Organization live streams",
   list: getContentLives,
   get: getContentLivesId,
+  // create answers the RTMPS server and the SECRET stream key, once.
+  create: postContentLives,
+  update: patchContentLivesId,
+  del: deleteContentLivesId,
   columns: ["id", "title", "status", "startsAt", "memberOnly"],
   extend: (root) => {
+    extendContentLives(root);
     root
       .command("playback-token")
       .description(
@@ -425,6 +515,75 @@ registerResource(program, {
       });
   },
 });
+
+registerResource(program, {
+  name: "content-channels",
+  describe: "Community channels",
+  create: postContentChannels,
+  update: patchContentChannelsId,
+  actions: [
+    {
+      name: "archive",
+      describe: "Archive a channel (no unarchive; its posts stay under All)",
+      fn: postContentChannelsIdArchive,
+      confirm: true,
+    },
+  ],
+  extend: extendContentChannels,
+});
+
+registerResource(program, {
+  name: "content-meetups",
+  describe: "Community meetups",
+  get: getContentMeetupsId,
+  create: postContentMeetups,
+  update: patchContentMeetupsId,
+  actions: [
+    {
+      name: "cancel",
+      describe: "Cancel a meetup (confirmed members are notified by email)",
+      fn: postContentMeetupsIdCancel,
+      confirm: true,
+    },
+  ],
+  extend: extendContentMeetups,
+});
+
+registerModeration(program);
+
+registerResource(program, {
+  name: "products",
+  describe: "Digital products and courses",
+  get: getProductsId,
+  create: postProducts,
+  update: patchProductsId,
+  del: deleteProductsId,
+  extend: extendProducts,
+});
+
+// Master box-office QRs (contract 1.33): one printed QR opens the sale flow of
+// an event (or of today's shows). `code`/`url` are secret and never rotate.
+registerResource(program, {
+  name: "master-qrs",
+  describe: "Master box-office QR codes",
+  create: postMasterQrs,
+  update: patchMasterQrsId,
+  del: deleteMasterQrsId,
+  extend: extendMasterQrs,
+});
+
+registerResource(program, {
+  name: "ticket-templates",
+  describe: "Reusable ticket type templates",
+  create: postTicketTemplates,
+  update: patchTicketTemplatesId,
+  del: deleteTicketTemplatesId,
+  extend: extendTicketTemplates,
+});
+
+registerOrganization(program);
+registerWebsite(program);
+registerMerch(program);
 
 registerPresaleWindows(program);
 
@@ -451,7 +610,9 @@ const family = (name: string) =>
   program.commands.find((c) => c.name() === name) as Command;
 registerCheckinUndo(family("tickets"));
 registerCourtesySeats(family("event-dates"));
+registerAccessClose(family("event-dates"));
 registerReports(program);
+registerLiveAttendance(family("reports"));
 registerApiKeys(program);
 registerAdmin(program);
 
