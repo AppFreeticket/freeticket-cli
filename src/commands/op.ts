@@ -19,8 +19,12 @@ export interface OpSpec {
   /** Commander signature, e.g. `"remove <eventId> <viewerId>"`. */
   name: string;
   describe: string;
-  /** Optional flags: [flags, description, default?]. */
-  options?: [string, string, string?][];
+  /**
+   * Optional flags: [flags, description, default or parser?]. A parser (e.g.
+   * `wholeNumber("--price")` from lib/input) runs while commander parses argv,
+   * so a bad value exits 1 before the confirmation and the request.
+   */
+  options?: [string, string, (string | ((input: string) => unknown))?][];
   /** Required flags: [flags, description]. */
   required?: [string, string][];
   /** `--data <json>` body (inline or @file): "required" or "optional". */
@@ -45,8 +49,8 @@ export function op(parent: Command, spec: OpSpec): Command {
   const cmd = parent.command(spec.name).description(spec.describe);
   for (const [flags, describe] of spec.required ?? [])
     cmd.requiredOption(flags, describe);
-  for (const [flags, describe, def] of spec.options ?? [])
-    cmd.option(flags, describe, def);
+  for (const [flags, describe, defOrParse] of spec.options ?? [])
+    cmd.option(flags, describe, defOrParse as never);
   if (spec.data === "required")
     cmd.requiredOption("--data <json>", "JSON body (inline or @file.json)");
   else if (spec.data === "optional")
@@ -73,9 +77,6 @@ export function op(parent: Command, spec: OpSpec): Command {
   });
   return cmd;
 }
-
-/** `"true"`/`"false"` flag value to boolean (anything else is false). */
-export const bool = (v: unknown) => v === true || v === "true";
 
 /** `"none"` clears a nullable field; anything else is sent as is. */
 export const orNull = (v: string) => (v === "none" ? null : v);

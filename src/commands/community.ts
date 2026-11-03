@@ -26,7 +26,8 @@ import {
   putContentVideosIdSeries,
 } from "../client/sdk.gen";
 import { fail } from "../lib/api";
-import { bool, list, op, orNull } from "./op";
+import { booleanFlag, wholeNumber } from "../lib/input";
+import { list, op, orNull } from "./op";
 
 /**
  * Community management from contracts 1.26-1.36 (channels, posts, videos and
@@ -35,8 +36,11 @@ import { bool, list, op, orNull } from "./op";
  * body, a second id or no id at all.
  */
 
-const page = (v: string | undefined) =>
-  v === undefined ? undefined : Number(v);
+const PAGE: [string, string, (input: string) => number] = [
+  "--page <n>",
+  "0-based page",
+  wholeNumber("--page"),
+];
 
 /** Extras of `ft content-posts`: pin/unpin. */
 export function extendContentPosts(root: Command): void {
@@ -62,8 +66,12 @@ export function extendContentVideos(root: Command): void {
     op(root, {
       name: `${name} <videoId>`,
       describe: published
-        ? "Publish a video to the community feed (members are notified once)"
+        ? "Publish a video to the community feed (members are notified once, so it asks; --yes skips)"
         : "Take a video out of the feed",
+      // Publishing notifies every member; unpublishing notifies nobody.
+      confirm: published
+        ? ([id]) => `Publish video ${id}? Community members get notified.`
+        : undefined,
       call: ([id]) =>
         putContentVideosIdPublished({ path: { id }, body: { published } }),
     });
@@ -176,11 +184,17 @@ export function extendContentMeetups(root: Command): void {
     name: "attendance <meetupId> <rsvpId>",
     describe:
       "Mark (or with --attended false, unmark) an attendee as checked in",
-    options: [["--attended <bool>", "true | false", "true"]],
+    options: [
+      [
+        "--attended <bool>",
+        "true | false (default true)",
+        booleanFlag("--attended"),
+      ],
+    ],
     call: ([id, rsvpId], o) =>
       putContentMeetupsIdAttendance({
         path: { id },
-        body: { rsvpId, attended: bool(o.attended) },
+        body: { rsvpId, attended: o.attended ?? true },
       }),
   });
 }
@@ -194,9 +208,8 @@ export function registerModeration(program: Command): void {
   op(mod, {
     name: "queue",
     describe: "Reported comments, most reported first (50 per page)",
-    options: [["--page <n>", "0-based page"]],
-    call: (_a, o) =>
-      getContentModerationQueue({ query: { page: page(o.page) } }),
+    options: [PAGE],
+    call: (_a, o) => getContentModerationQueue({ query: { page: o.page } }),
     columns: ["commentId", "openReportCount", "hidden", "deleted", "body"],
   });
   op(mod, {
@@ -208,13 +221,10 @@ export function registerModeration(program: Command): void {
   op(mod, {
     name: "member-posts",
     describe: "Member posts awaiting review (or recently published)",
-    options: [
-      ["--status <s>", "PENDING_REVIEW | PUBLISHED"],
-      ["--page <n>", "0-based page"],
-    ],
+    options: [["--status <s>", "PENDING_REVIEW | PUBLISHED"], PAGE],
     call: (_a, o) =>
       getContentModerationMemberPosts({
-        query: { status: o.status, page: page(o.page) },
+        query: { status: o.status, page: o.page },
       }),
     columns: ["postId", "status", "channelName", "updatedAt", "content"],
   });

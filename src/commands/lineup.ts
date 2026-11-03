@@ -10,7 +10,7 @@ import {
   putEventsIdArtists,
 } from "../client/sdk.gen";
 import { configureClient, unwrap } from "../lib/api";
-import { confirmOrExit } from "../lib/input";
+import { confirmOrExit, parseLimit } from "../lib/input";
 import { print, printNextCursor } from "../lib/output";
 
 /** Prints API `warnings[]` (e.g. ARTIST_IDS_IGNORED) on stderr, keeping stdout clean for --json. */
@@ -37,7 +37,7 @@ export function registerArtists(program: Command): void {
   root
     .command("search <q>")
     .description("Search registered artists by name (2+ characters)")
-    .option("--limit <n>", "results per page (1-100)", "20")
+    .option("--limit <n>", "results per page (1-100)", parseLimit, 20)
     .option("--cursor <id>", "pagination cursor")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
@@ -45,7 +45,7 @@ export function registerArtists(program: Command): void {
       configureClient(opts.workspace);
       const body = unwrap(
         await getArtists({
-          query: { q, limit: Number(opts.limit), cursor: opts.cursor },
+          query: { q, limit: opts.limit, cursor: opts.cursor },
         }),
       );
       print(body.data, {
@@ -77,25 +77,40 @@ export function registerEventLineup(events: Command): void {
     )
     .option(
       "--invite <email...>",
-      "invite artists without an account (additive)",
+      "invite artists without an account (additive; sends them an email, so it asks)",
     )
-    .option("--yes", "skip confirmation when artists would be removed")
+    .option(
+      "--yes",
+      "skip confirmation (asked when artists would be removed or invitations emailed)",
+    )
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
     .action(async (eventId, opts) => {
       configureClient(opts.workspace);
       const artistIds: string[] = opts.artist ?? [];
+      const invites: string[] = opts.invite ?? [];
       if (!opts.yes) {
         // The PUT replaces the whole lineup: name who drops out before asking.
         const current = unwrap(await getEventsId({ path: { id: eventId } }));
         const removed = (current.data.artists ?? []).filter(
           (a) => !artistIds.includes(a.id),
         );
-        if (removed.length > 0 || artistIds.length === 0)
+        const asks: string[] = [];
+        if (artistIds.length === 0)
+          asks.push(
+            `Clear the lineup of event ${eventId}${removed.length ? ` (removes ${removed.map((a) => a.name).join(", ")})` : ""}`,
+          );
+        else if (removed.length > 0)
+          asks.push(
+            `Remove ${removed.map((a) => a.name).join(", ")} from event ${eventId}`,
+          );
+        // Each invitation is an email to someone outside FreeTicket.
+        if (invites.length > 0)
+          asks.push(`email an invitation to ${invites.join(", ")}`);
+        const question = asks.join(" and ");
+        if (question)
           await confirmOrExit(
-            artistIds.length === 0
-              ? `Clear the lineup of event ${eventId}${removed.length ? ` (removes ${removed.map((a) => a.name).join(", ")})` : ""}?`
-              : `Remove ${removed.map((a) => a.name).join(", ")} from event ${eventId}?`,
+            `${question[0]?.toUpperCase()}${question.slice(1)}?`,
             false,
           );
       }
@@ -158,10 +173,17 @@ export function registerEventLineup(events: Command): void {
 
   invitations
     .command("resend <eventId> <invitationId>")
-    .description("Resend an invitation email and renew it for 14 days")
+    .description(
+      "Resend an invitation email and renew it for 14 days (asks; --yes skips)",
+    )
+    .option("--yes", "skip confirmation")
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
     .action(async (eventId, invitationId, opts) => {
+      await confirmOrExit(
+        `Resend invitation ${invitationId} of event ${eventId}? The artist gets another email.`,
+        opts.yes,
+      );
       configureClient(opts.workspace);
       const body = unwrap(
         await postEventsIdArtistInvitationsInvitationIdResend({

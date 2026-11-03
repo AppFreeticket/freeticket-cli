@@ -12,7 +12,12 @@ import {
   postTicketTypesIdPresaleWindows,
 } from "../client/sdk.gen";
 import { configureClient, fail, unwrap } from "../lib/api";
-import { confirmOrExit } from "../lib/input";
+import {
+  booleanFlag,
+  confirmOrExit,
+  noneToNull,
+  wholeNumberOrNone,
+} from "../lib/input";
 import { print } from "../lib/output";
 
 /**
@@ -32,18 +37,31 @@ const PRESALE_COLUMNS = [
   "isActive",
 ];
 
+/** Presale window flags, already typed by the commander parsers below. */
+interface PresaleOpts {
+  plan?: string;
+  startsAt?: string;
+  endsAt?: string;
+  capacity?: number | "none";
+  active?: boolean;
+}
+
 /** Presale window body from flags; only the flags passed are sent. */
-function presaleBody(opts: Record<string, string | boolean | undefined>) {
+function presaleBody(opts: PresaleOpts) {
   const body: Record<string, unknown> = {};
   if (opts.plan) body.planId = opts.plan;
   if (opts.startsAt) body.presaleStartsAt = opts.startsAt;
   if (opts.endsAt) body.presaleEndsAt = opts.endsAt;
   if (opts.capacity !== undefined)
-    body.presaleCapacity =
-      opts.capacity === "none" ? null : Number(opts.capacity);
-  if (opts.active !== undefined) body.isActive = opts.active === "true";
+    body.presaleCapacity = noneToNull(opts.capacity);
+  if (opts.active !== undefined) body.isActive = opts.active;
   return body;
 }
+
+// Parsed while commander reads argv: `--capacity 1,000` or `--active yes`
+// exit 1 before any request instead of sending 1 or false.
+const capacity = wholeNumberOrNone("--capacity");
+const active = booleanFlag("--active");
 
 /** `ft events schedule set|clear <eventId>` */
 export function registerEventSchedule(events: Command): void {
@@ -122,8 +140,12 @@ export function registerPresaleWindows(program: Command): void {
     .requiredOption("--plan <planId>", "membership plan of this workspace")
     .requiredOption("--starts-at <iso>", "presale start (UTC)")
     .requiredOption("--ends-at <iso>", "presale end (UTC, after start)")
-    .option("--capacity <n>", "max tickets sold in the presale")
-    .option("--active <bool>", "true | false (default true)")
+    .option(
+      "--capacity <n>",
+      'max tickets sold in the presale (whole number, or "none")',
+      capacity,
+    )
+    .option("--active <bool>", "true | false (default true)", active)
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
     .action(async (ticketTypeId, opts) => {
@@ -143,8 +165,12 @@ export function registerPresaleWindows(program: Command): void {
     .option("--plan <planId>", "membership plan of this workspace")
     .option("--starts-at <iso>", "presale start (UTC)")
     .option("--ends-at <iso>", "presale end (UTC)")
-    .option("--capacity <n>", 'max tickets, or "none" to remove the cap')
-    .option("--active <bool>", "true | false")
+    .option(
+      "--capacity <n>",
+      'max tickets (whole number), or "none" to remove the cap',
+      capacity,
+    )
+    .option("--active <bool>", "true | false", active)
     .option("--workspace <id>", "workspace override")
     .option("--json", "raw JSON output")
     .action(async (windowId, opts) => {

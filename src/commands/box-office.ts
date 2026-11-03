@@ -8,15 +8,18 @@ import {
   getPaymentIntents,
   getReportsLiveAttendance,
   getTicketTemplates,
+  patchMasterQrsId,
   postEventDatesIdAccessClose,
   postEventsIdValidators,
   postEventsIdViewers,
+  postMasterQrs,
   postStaffIdResendInvite,
   postTicketTemplatesIdInstantiate,
   putMasterQrsIdActive,
   putStaffIdAccess,
 } from "../client/sdk.gen";
 import { fail } from "../lib/api";
+import { parseLimit, wholeNumber } from "../lib/input";
 import { list, op, orNull } from "./op";
 
 /**
@@ -92,6 +95,15 @@ export function registerEventAccess(events: Command): void {
 
 const ACCESS_TYPES = ["admin", "validador", "personalizado", "lectura"];
 
+/** Body flags of `staff access` (option key, flag), exclusive with --data. */
+const ACCESS_FLAGS = [
+  ["type", "--type"],
+  ["sections", "--sections"],
+  ["validatorEvents", "--validator-events"],
+  ["viewerEvents", "--viewer-events"],
+  ["expiresAt", "--expires-at"],
+] as const;
+
 /** `ft staff access <id>` and `ft staff resend-invite <id>` */
 export function registerStaffAccess(staff: Command): void {
   op(staff, {
@@ -113,7 +125,16 @@ export function registerStaffAccess(staff: Command): void {
     ],
     data: "optional",
     check: (_args, o) => {
-      if (o.data !== undefined) return;
+      if (o.data !== undefined) {
+        // --data is the whole body: flags next to it would be dropped silently,
+        // and in a full replace a dropped --sections is access removed.
+        const mixed = ACCESS_FLAGS.filter(([key]) => o[key] !== undefined);
+        if (mixed.length > 0)
+          fail(
+            `Pass either --data or the flags, not both (got --data and ${mixed.map(([, flag]) => flag).join(", ")}).`,
+          );
+        return;
+      }
       if (!o.type) fail("Pass --type (or the whole body with --data).");
       if (!ACCESS_TYPES.includes(o.type))
         fail(`--type must be one of: ${ACCESS_TYPES.join(", ")}.`);
@@ -179,7 +200,7 @@ export function registerPaymentIntents(sales: Command): void {
     options: [
       ["--event-date <id>", "only this date"],
       ["--only-abandoned", "only journeys that did not buy"],
-      ["--limit <n>", "rows per page"],
+      ["--limit <n>", "rows per page (1-100)", parseLimit],
       ["--cursor <c>", "pagination cursor"],
     ],
     call: (_args, o) =>
@@ -188,7 +209,7 @@ export function registerPaymentIntents(sales: Command): void {
           event: o.event,
           eventDate: o.eventDate,
           onlyAbandoned: o.onlyAbandoned ? true : undefined,
-          limit: o.limit ? Number(o.limit) : undefined,
+          limit: o.limit,
           cursor: o.cursor,
         },
       }),
@@ -230,18 +251,60 @@ export function registerLiveAttendance(reports: Command): void {
   });
 }
 
-/** Extras of `ft master-qrs`: list and activate/deactivate. */
+/** Master QR `code` and `url` are secrets: whoever has them reaches the sale flow. */
+const SECRET_QR_FIELDS = ["code", "url"];
+
+/**
+ * Drops `code`/`url` from a master QR (or a list of them) unless `--full`.
+ * Applies to `--json` too: a JSON dump piped into a log or an agent's context
+ * leaks the secret just as well as a table, and it cannot be rotated.
+ */
+export function redactMasterQr(data: unknown, full: boolean): unknown {
+  if (full) return data;
+  const strip = (row: unknown) =>
+    row && typeof row === "object"
+      ? Object.fromEntries(
+          Object.entries(row).filter(([k]) => !SECRET_QR_FIELDS.includes(k)),
+        )
+      : row;
+  return Array.isArray(data) ? data.map(strip) : strip(data);
+}
+
+const FULL: [string, string] = [
+  "--full",
+  "include the secret code and url (table and --json)",
+];
+
+/** `ft master-qrs list|create|update|activate|deactivate` (delete is CRUD). */
 export function extendMasterQrs(root: Command): void {
   op(root, {
     name: "list",
     describe:
-      "Master box-office QR codes (`code`/`url` are secret: shown only with --full or --json)",
-    options: [["--full", "show every field, including code and url"]],
+      "Master box-office QR codes (`code`/`url` are secret: left out, also from --json, unless --full)",
+    options: [FULL],
     call: () => getMasterQrs({}),
+    pick: (body, o) => redactMasterQr(body.data, Boolean(o.full)),
     columns: (o) =>
       o.full
         ? undefined
         : ["id", "label", "mode", "eventId", "active", "scans", "lastScanAt"],
+  });
+  op(root, {
+    name: "create",
+    describe:
+      "Create a master QR. Prints its SECRET code and url: you need them to print the QR, they never rotate, and whoever has them reaches the sale flow. Keep the output private.",
+    data: "required",
+    call: (_a, _o, data) => postMasterQrs({ body: data as never }),
+  });
+  op(root, {
+    name: "update <id>",
+    describe:
+      "Update a master QR (label, mode, eventId, ticketTypeId). The secret code/url are left out of the output unless --full",
+    data: "required",
+    options: [FULL],
+    call: ([id], _o, data) =>
+      patchMasterQrsId({ path: { id }, body: data as never }),
+    pick: (body, o) => redactMasterQr(body.data, Boolean(o.full)),
   });
   for (const [name, active] of [
     ["activate", true],
@@ -268,8 +331,16 @@ export function extendTicketTemplates(root: Command): void {
     required: [["--event-date <id>", "event date that gets the ticket type"]],
     options: [
       ["--name <name>", "override the template's name"],
-      ["--price <n>", "override the price"],
-      ["--capacity <n>", "override the capacity"],
+      [
+        "--price <n>",
+        "override the price (whole COP, no separators: 50000)",
+        wholeNumber("--price"),
+      ],
+      [
+        "--capacity <n>",
+        "override the capacity (whole number)",
+        wholeNumber("--capacity"),
+      ],
     ],
     call: ([templateId], o) =>
       postTicketTemplatesIdInstantiate({
@@ -277,8 +348,8 @@ export function extendTicketTemplates(root: Command): void {
         body: {
           eventDateId: o.eventDate,
           name: o.name,
-          price: o.price === undefined ? undefined : Number(o.price),
-          capacity: o.capacity === undefined ? undefined : Number(o.capacity),
+          price: o.price,
+          capacity: o.capacity,
         },
       }),
   });

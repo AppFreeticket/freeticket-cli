@@ -99,8 +99,11 @@ export function registerWebsite(program: Command): void {
   op(root, {
     name: "set",
     describe:
-      "Save the whole website configuration (FULL replace: start from `ft website get --json`)",
+      "Save the whole website configuration (FULL replace: start from `ft website get --json`; asks, --yes skips)",
     data: "required",
+    // A PUT of the whole config: a partial --data wipes every section left out.
+    confirm: () =>
+      "Replace the whole website configuration of this workspace? Sections missing from --data are removed.",
     call: (_a, _o, data) => putWebsite({ body: data as never }),
   });
   for (const [name, published] of [

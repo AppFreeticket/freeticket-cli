@@ -54,7 +54,6 @@ import {
   patchDiscountsId,
   patchEventsId,
   patchEventsIdDatesDateId,
-  patchMasterQrsId,
   patchMembershipPlansId,
   patchProductsId,
   patchStaffIdRole,
@@ -75,7 +74,6 @@ import {
   postEventsIdCancel,
   postEventsIdDates,
   postEventsIdPublish,
-  postMasterQrs,
   postMembershipPlans,
   postProducts,
   postSales,
@@ -138,7 +136,7 @@ import {
   unwrap,
 } from "./lib/api";
 import { banner } from "./lib/banner";
-import { parseData } from "./lib/input";
+import { booleanFlag, parseData } from "./lib/input";
 import { print } from "./lib/output";
 
 /**
@@ -377,6 +375,7 @@ registerResource(program, {
       flag: "--active <bool>",
       describe: "filter by active (true/false)",
       query: "active",
+      parse: booleanFlag("--active"),
     },
   ],
 });
@@ -562,12 +561,11 @@ registerResource(program, {
 });
 
 // Master box-office QRs (contract 1.33): one printed QR opens the sale flow of
-// an event (or of today's shows). `code`/`url` are secret and never rotate.
+// an event (or of today's shows). `code`/`url` are secret and never rotate, so
+// list/create/update live in extendMasterQrs, which redacts them.
 registerResource(program, {
   name: "master-qrs",
   describe: "Master box-office QR codes",
-  create: postMasterQrs,
-  update: patchMasterQrsId,
   del: deleteMasterQrsId,
   extend: extendMasterQrs,
 });

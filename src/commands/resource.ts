@@ -54,7 +54,13 @@ interface ResourceSpec {
   /** Columns to show in list table / CSV output. */
   columns?: string[];
   /** Extra list flags -> query entries. Example: status, eventDateId. */
-  listFlags?: { flag: string; describe: string; query: string }[];
+  listFlags?: {
+    flag: string;
+    describe: string;
+    query: string;
+    /** Commander parser (e.g. `booleanFlag`), run before any request. */
+    parse?: (input: string) => unknown;
+  }[];
   /** Commands that don't fit the CRUD shape (extra args, non-JSON responses). */
   extend?: (root: Command) => void;
 }
@@ -88,7 +94,9 @@ export function registerResource(program: Command, spec: ResourceSpec): void {
       .option("--csv", "CSV output (for spreadsheets/accounting)")
       .option("--json", "raw JSON output (data only)")
       .option("--raw", "raw JSON output including pagination metadata (page)");
-    for (const f of spec.listFlags ?? []) cmd.option(f.flag, f.describe);
+    for (const f of spec.listFlags ?? [])
+      if (f.parse) cmd.option(f.flag, f.describe, f.parse);
+      else cmd.option(f.flag, f.describe);
     cmd.action(async (opts) => {
       let columns = resolveColumns(opts, spec.columns);
       opts.limit = parseLimit(opts.limit);

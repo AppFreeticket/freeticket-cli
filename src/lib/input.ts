@@ -9,12 +9,62 @@ import { fail } from "./api";
  */
 export function parseLimit(input: string): number {
   const n = Number(input);
-  if (!Number.isInteger(n) || n < 1 || n > 100)
+  // The regex too: Number() also takes "5.0", "1e1" and " 20".
+  if (!/^\d+$/.test(input) || n < 1 || n > 100)
     fail(
       `Invalid --limit: ${input}. Use an integer from 1 to 100.`,
       "For more rows, add --all to walk every page.",
     );
   return n;
+}
+
+/**
+ * Commander option parsers for typed flags. They run while commander parses
+ * argv, so a bad value exits 1 before any confirmation prompt or request.
+ *
+ * `Number()` was not enough: `Number("50.000") === 50` turned a COP price
+ * typed with a thousands separator into fifty pesos, and `Number("abc")` is
+ * NaN, which `JSON.stringify` sends as `null` (a capacity cleared by a typo).
+ * Booleans were `v === "true"`, so `--active yes` silently meant false.
+ */
+export function wholeNumber(flag: string): (input: string) => number {
+  return (input) => {
+    if (!/^\d+$/.test(input))
+      fail(
+        `Invalid ${flag}: ${input}. Use a whole number with no separators or decimals (e.g. 50000).`,
+      );
+    return Number(input);
+  };
+}
+
+/**
+ * `wholeNumber`, or `"none"` to clear a nullable field. Returns `"none"`, not
+ * null: commander turns a parser's null into "" (map it with `noneToNull`).
+ */
+export function wholeNumberOrNone(
+  flag: string,
+): (input: string) => number | "none" {
+  return (input) => {
+    if (input === "none") return "none";
+    if (!/^\d+$/.test(input))
+      fail(
+        `Invalid ${flag}: ${input}. Use a whole number with no separators or decimals (e.g. 50000), or "none".`,
+      );
+    return Number(input);
+  };
+}
+
+/** The body value of a `wholeNumberOrNone` flag. */
+export const noneToNull = <T>(v: T | "none"): T | null =>
+  v === "none" ? null : v;
+
+/** `"true"` / `"false"` only; anything else (yes, 1, si) exits 1. */
+export function booleanFlag(flag: string): (input: string) => boolean {
+  return (input) => {
+    if (input !== "true" && input !== "false")
+      fail(`Invalid ${flag}: ${input}. Use true or false.`);
+    return input === "true";
+  };
 }
 
 /**

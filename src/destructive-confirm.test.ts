@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { Command } from "commander";
 import {
   afterEach,
   beforeEach,
@@ -13,6 +14,11 @@ import {
  * End-to-end through commander: a destructive command run without a TTY and
  * without --yes must exit 1 BEFORE the SDK call. The generated SDK functions
  * are mocked so nothing could reach the network even if the gate regressed.
+ *
+ * Each CASES row is checked both ways: refused without --yes, and with --yes
+ * its SDK function is called exactly once. Without the second half a row
+ * could point at a function its command never calls (or at another command's
+ * function) and the "never calls" assertion would pass vacuously.
  */
 const sdk = vi.hoisted(() => ({
   postEventsIdCancel: vi.fn(),
@@ -46,6 +52,12 @@ const sdk = vi.hoisted(() => ({
   postStaffIdResendInvite: vi.fn(),
   postContentMeetupsIdPublish: vi.fn(),
   patchContentMeetupsIdRsvpsRsvpId: vi.fn(),
+  postEventsIdArtistInvitationsInvitationIdResend: vi.fn(),
+  putEventsIdArtists: vi.fn(),
+  putContentVideosIdPublished: vi.fn(),
+  putWebsite: vi.fn(),
+  // Read by `events artists set` before it asks (who would drop out).
+  getEventsId: vi.fn(),
   deleteWorkspacesId: vi.fn(),
 }));
 
@@ -63,6 +75,12 @@ vi.mock("./admin-client/sdk.gen", async (importOriginal) => ({
 
 const { program } = await import("./program");
 
+/** A 200 the commands can print (lineup `set` reads `data.artists`). */
+const ok = () => ({
+  data: { data: { artists: [] } },
+  response: new Response(),
+});
+
 describe("destructive commands refuse without a TTY and without --yes", () => {
   const tty = process.stdin.isTTY;
   let exit: MockInstance<typeof process.exit>;
@@ -74,9 +92,23 @@ describe("destructive commands refuse without a TTY and without --yes", () => {
       configurable: true,
     });
     stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     exit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("exited");
     }) as never);
+    // Credentials, so the only thing that can stop a command is the gate (the
+    // SDK is mocked: they never reach a network). Commands that configure the
+    // client before asking (`events artists set`) need them for the refusal.
+    vi.stubEnv("FT_API_KEY", "ft_test_key");
+    vi.stubEnv("FT_ADMIN_SESSION", "test-session");
+    for (const fn of Object.values(sdk)) fn.mockResolvedValue(ok());
+    // The lineup already has org_1, so `set --artist org_1 --invite …` removes
+    // nobody: what it asks about is the invitation email alone.
+    sdk.getEventsId.mockResolvedValue({
+      data: { data: { artists: [{ id: "org_1", name: "Artist One" }] } },
+      response: new Response(),
+    });
   });
 
   afterEach(() => {
@@ -85,6 +117,7 @@ describe("destructive commands refuse without a TTY and without --yes", () => {
       configurable: true,
     });
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     for (const fn of Object.values(sdk)) fn.mockReset();
   });
 
@@ -96,6 +129,14 @@ describe("destructive commands refuse without a TTY and without --yes", () => {
     // The exit must come from the confirmation gate, not e.g. "Not logged in".
     expect(stderr.mock.calls[0]?.[0]).toMatch(/^Refusing: .*no TTY to confirm/);
     expect(fn).not.toHaveBeenCalled();
+  });
+
+  it.each(
+    CASES,
+  )("ft %j --yes calls its SDK function exactly once", async (args, fn) => {
+    await program.parseAsync(["node", "ft", ...(args as string[]), "--yes"]);
+    expect(exit).not.toHaveBeenCalled();
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it("covers every operation the contract marks x-ft-destructive", () => {
@@ -203,4 +244,147 @@ const CASES: [string[], (typeof sdk)[keyof typeof sdk]][] = [
     ["content-meetups", "rsvp", "mt_1", "rsvp_1", "--approve"],
     sdk.patchContentMeetupsIdRsvpsRsvpId,
   ],
+  [
+    ["events", "invitations", "resend", "evt_1", "inv_1"],
+    sdk.postEventsIdArtistInvitationsInvitationIdResend,
+  ],
+  [
+    [
+      "events",
+      "artists",
+      "set",
+      "evt_1",
+      "--artist",
+      "org_1",
+      "--invite",
+      "a@b.co",
+    ],
+    sdk.putEventsIdArtists,
+  ],
+  [["content-videos", "publish", "vid_1"], sdk.putContentVideosIdPublished],
+  // Not an email, but a FULL replace: a partial --data wipes the rest.
+  [["website", "set", "--data", '{"sections":[]}'], sdk.putWebsite],
 ];
+
+/** Every leaf of the command tree, as `"events artists set"`. */
+function leaves(cmd: Command, path: string[] = []): [string, Command][] {
+  if (cmd.commands.length === 0) return [[path.join(" "), cmd]];
+  return cmd.commands.flatMap((sub) => leaves(sub, [...path, sub.name()]));
+}
+/** The command path that argv resolves to (subcommand names, no args). */
+function commandPath(args: string[]): string {
+  const path: string[] = [];
+  let cmd: Command = program;
+  for (const arg of args) {
+    const sub = cmd.commands.find(
+      (c) => c.name() === arg || c.aliases().includes(arg),
+    );
+    if (!sub) break;
+    path.push(sub.name());
+    cmd = sub;
+  }
+  return path.join(" ");
+}
+const hasYes = (cmd: Command) => cmd.options.some((o) => o.long === "--yes");
+
+/**
+ * Writes that notify someone and still run without asking, on purpose. If one
+ * of them gains a gate, or disappears, the sweep below fails and this list is
+ * revisited instead of rotting.
+ */
+const UNGATED_ON_PURPOSE: Record<string, string> = {
+  "content-moderation approve":
+    "approving IS the reviewer's decision, and --expected-updated-at already pins the exact version read; the author's notification is the point",
+  "tickets resend":
+    "one email to the ticket's own buyer, the same QR again: the command exists to send it",
+  "content-posts create":
+    "the --data body is the message itself; with community_v2 members are notified like in the dashboard (no draft step to confirm separately)",
+  "products update":
+    "only new lessons on a published course notify its buyers, like the dashboard; the body is a full tree read just before",
+};
+
+describe("confirmation gates across the whole command tree", () => {
+  it("exactly these commands accept --yes", () => {
+    // A new destructive or notifying command that forgets its gate, or a gate
+    // dropped by a refactor, changes this list: update it on purpose.
+    expect(
+      leaves(program)
+        .filter(([, cmd]) => hasYes(cmd))
+        .map(([path]) => path)
+        .sort(),
+    ).toEqual([
+      "admin feature-flags set",
+      "admin impersonate",
+      "admin tokens revoke",
+      "admin workspaces delete",
+      "admin workspaces plan",
+      "admin workspaces plan-show",
+      "admin workspaces restore",
+      "admin workspaces suspend",
+      "api-keys revoke",
+      "content-channels archive",
+      "content-comments delete",
+      "content-lives delete",
+      "content-lives reset-key",
+      "content-meetups cancel",
+      "content-meetups publish",
+      "content-meetups rsvp",
+      "content-members ban",
+      "content-moderation reject",
+      "content-moderation remove",
+      "content-posts delete",
+      "content-series delete",
+      "content-videos delete",
+      "content-videos publish",
+      "discounts delete",
+      "event-dates access-close sign",
+      "event-dates delete",
+      "events artists remove",
+      "events artists set",
+      "events cancel",
+      "events delete",
+      "events invitations cancel",
+      "events invitations resend",
+      "events validators add",
+      "events viewers add",
+      "events viewers remove",
+      "master-qrs delete",
+      "plans delete",
+      "presale-windows delete",
+      "products delete",
+      "sales abandon",
+      "sales recipient set",
+      "sales transfer",
+      "staff access",
+      "staff delete",
+      "staff resend-invite",
+      "ticket-templates delete",
+      "ticket-types delete",
+      "tickets checkin-undo",
+      "venues delete",
+      "webhooks delete",
+      "website set",
+    ]);
+  });
+
+  it("every CASES row is a gated command of the tree", () => {
+    const gated = new Set(
+      leaves(program)
+        .filter(([, cmd]) => hasYes(cmd))
+        .map(([path]) => path),
+    );
+    const rows = CASES.map(([args]) => commandPath(args));
+    expect(rows.filter((r) => !gated.has(r))).toEqual([]);
+  });
+
+  it.each(
+    Object.entries(UNGATED_ON_PURPOSE),
+  )("%s still exists and still runs without a gate", (path) => {
+    const leaf = leaves(program).find(([p]) => p === path);
+    expect(
+      leaf,
+      `${path} is gone: drop it from UNGATED_ON_PURPOSE`,
+    ).toBeDefined();
+    expect(hasYes(leaf?.[1] as Command)).toBe(false);
+  });
+});
