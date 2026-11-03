@@ -30,7 +30,7 @@ import {
 } from "../admin-client/sdk.gen";
 import { configureAdminClient, unwrap } from "../lib/api";
 import { CONFIG_PATH, loadConfig, saveConfig } from "../lib/config";
-import { confirmOrExit, parseData } from "../lib/input";
+import { confirmOrExit, parseData, parseLimit } from "../lib/input";
 import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
 import { registerAdminCrm } from "./admin-crm";
 
@@ -330,7 +330,7 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
       configureAdminClient();
       const query: Record<string, unknown> = {};
       if (!spec.noPaging) {
-        query.limit = Number(opts.limit);
+        query.limit = parseLimit(opts.limit);
         query.cursor = opts.cursor;
       }
       for (const f of spec.listFlags ?? []) {
