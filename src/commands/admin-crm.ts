@@ -152,16 +152,48 @@ export function crmErrorHint(
       return PAYLOAD_HINT;
     case "WHATSAPP_UNAVAILABLE":
       return "The WhatsApp provider did not answer. Safe to retry by hand in a moment - the CLI never retries a write on its own.";
+    case "RATE_LIMITED":
+      return retryAfter !== undefined
+        ? `Too many CRM requests in a short time. Run it again by hand ${describeWhen(retryAfter)} - the CLI never retries a write on its own.`
+        : "Too many CRM requests in a short time. Wait a minute and run it again by hand - the CLI never retries a write on its own.";
     default:
       return null;
   }
 }
 
 /**
+ * After a failed write whose outcome is unknown (5xx, a dropped connection):
+ * the backend may have acted. Never "retry with backoff" here — that is how a
+ * campaign goes out twice.
+ */
+export const WRITE_OUTCOME_UNKNOWN_HINT =
+  "The write may or may not have gone through - the CLI never retries it. Check `ft admin crm campaigns list` (or `campaigns get <id>`) before running it again.";
+
+/**
+ * Runs one CRM write exactly once. A thrown request (timeout, connection
+ * reset) is reported as "outcome unknown" instead of bubbling up as a stack
+ * trace that invites a blind re-run.
+ */
+async function crmWriteOnce<T>(call: () => Promise<SdkResult<T>>): Promise<T> {
+  let res: SdkResult<T>;
+  try {
+    res = await call();
+  } catch (err) {
+    fail(
+      `Error: the request did not complete (${(err as Error)?.message ?? String(err)}).`,
+      WRITE_OUTCOME_UNKNOWN_HINT,
+    );
+  }
+  return crmUnwrap(res, { write: true });
+}
+
+/**
  * `unwrap` plus the CRM's named errors. Formats the envelope itself because
  * `details` is not always a list here (`{ existingId }` on a duplicate).
+ * With `write`, a 5xx without a named code gets the "outcome unknown" hint
+ * instead of the generic "retry with backoff".
  */
-function crmUnwrap<T>(res: SdkResult<T>): T {
+function crmUnwrap<T>(res: SdkResult<T>, opts: { write?: boolean } = {}): T {
   if (res.data !== undefined) return res.data;
   const err = (res.error as { error?: CrmError } | undefined)?.error;
   const status = res.response?.status;
@@ -170,7 +202,11 @@ function crmUnwrap<T>(res: SdkResult<T>): T {
       "Error 413 [PAYLOAD_TOO_LARGE]: request body too large.",
       PAYLOAD_HINT,
     );
-  if (!err) return unwrap(res);
+  if (!err) {
+    if (opts.write && status !== undefined && status >= 500)
+      fail(`Error ${status}: the server failed.`, WRITE_OUTCOME_UNKNOWN_HINT);
+    return unwrap(res);
+  }
   const lines = [
     `Error ${status ?? ""} [${err.code ?? "?"}]: ${err.message ?? "unknown failure"}`,
   ];
@@ -182,7 +218,29 @@ function crmUnwrap<T>(res: SdkResult<T>): T {
   }
   const hint = crmErrorHint(err, retryAfterSeconds(res.response));
   if (hint) fail(lines.join("\n"), hint);
+  if (opts.write && status !== undefined && status >= 500)
+    fail(lines.join("\n"), WRITE_OUTCOME_UNKNOWN_HINT);
   return unwrap(res);
+}
+
+/**
+ * The contract types the audience filter only as `{ version: 2, ... }` (the
+ * server validates the rest and answers 422 with `details[].path`). Checking
+ * the version here turns a v1 filter or a stray array into a clear error
+ * before anything is sent.
+ */
+export function parseFilter(
+  value: unknown,
+  flag: string,
+): AdminCrmAudienceFilter {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    fail(`${flag} must be a JSON object (audience filter v2).`);
+  if ((value as { version?: unknown }).version !== 2)
+    fail(
+      `${flag} must be an audience filter v2: \`{ "version": 2, "scope": …, "include": […], "except": […] }\`.`,
+      "See the `ft admin crm` section of the README for an example.",
+    );
+  return value as AdminCrmAudienceFilter;
 }
 
 /** `--sender freeticket|<workspaceId>` → the contract's `sender`. */
@@ -329,7 +387,9 @@ export function registerAdminCrm(admin: Command): void {
         `Cancel campaign ${id}? It will not be sent`,
         opts.yes,
       );
-      const body = crmUnwrap(await postCrmCampaignsIdCancel({ path: { id } }));
+      const body = await crmWriteOnce(() =>
+        postCrmCampaignsIdCancel({ path: { id } }),
+      );
       print(body.data, { json: opts.json });
     });
 
@@ -351,8 +411,8 @@ export function registerAdminCrm(admin: Command): void {
         `Send the next batch of campaign ${id}${opts.ignoreWindow ? " (ignoring the send window)" : ""}?`,
         opts.yes,
       );
-      const body = crmUnwrap(
-        await postCrmCampaignsIdBatchesNext({
+      const body = await crmWriteOnce(() =>
+        postCrmCampaignsIdBatchesNext({
           path: { id },
           ...(opts.ignoreWindow ? { body: { ignoreSendWindow: true } } : {}),
         }),
@@ -374,8 +434,8 @@ export function registerAdminCrm(admin: Command): void {
         `Stop campaign ${id}? Pending recipients will never be sent (irreversible)`,
         opts.yes,
       );
-      const body = crmUnwrap(
-        await postCrmCampaignsIdBatchesStop({ path: { id } }),
+      const body = await crmWriteOnce(() =>
+        postCrmCampaignsIdBatchesStop({ path: { id } }),
       );
       print(body.data, { json: opts.json });
     });
@@ -462,7 +522,7 @@ export function registerAdminCrm(admin: Command): void {
     .option("--json", "raw JSON output")
     .action(async (opts) => {
       configureAdminClient();
-      const filter = parseData(opts.filter) as AdminCrmAudienceFilter;
+      const filter = parseFilter(parseData(opts.filter), "--filter");
       const body = crmUnwrap(
         await postCrmAudiencePreview({
           body: {
@@ -509,6 +569,7 @@ export function registerAdminCrm(admin: Command): void {
           "--data needs a `filter` (and channel, sender, subject, body, timing).",
           "See the `ft admin crm` section of the README for a campaign.json example.",
         );
+      parseFilter(input.filter, "--data.filter");
       // Same filter and sender the launch will use: what you confirm is what
       // the backend resolves.
       const preview = crmUnwrap(
@@ -541,7 +602,7 @@ export function registerAdminCrm(admin: Command): void {
         `Launch to ${reach} people by ${input.channel ?? "?"}, sending ${when}${input.ignoreSendWindow ? " (ignoring the send window)" : ""}?`,
         opts.yes,
       );
-      const body = crmUnwrap(await postCrmCampaigns({ body: input }));
+      const body = await crmWriteOnce(() => postCrmCampaigns({ body: input }));
       print(body.data, { json: opts.json });
       if (!opts.json)
         console.error(

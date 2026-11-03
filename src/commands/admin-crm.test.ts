@@ -450,6 +450,23 @@ describe("ft admin crm commands", () => {
     ).rejects.toThrow("exited");
     expect(stderr.join("\n")).toContain("· filter.scope.level: Invalid input");
   });
+
+  it.each([
+    ["preview", "--filter", '{"scope":{"level":"platform"}}'],
+    ["preview", "--filter", "[]"],
+    [
+      "launch",
+      "--data",
+      JSON.stringify({ channel: "EMAIL", filter: { version: 1 } }),
+      "--yes",
+    ],
+  ])("a filter that is not v2 stops before any request: %j", async (...args) => {
+    await expect(run(...args)).rejects.toThrow("exited");
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(stderr.join("\n")).toMatch(/audience filter v2/);
+    expect(sdk.postCrmAudiencePreview).not.toHaveBeenCalled();
+    expect(sdk.postCrmCampaigns).not.toHaveBeenCalled();
+  });
 });
 
 describe("helpers", () => {

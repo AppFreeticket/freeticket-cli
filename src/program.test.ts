@@ -47,7 +47,7 @@ test("contract 1.19 / admin 1.5 commands are wired, destructive ones behind --ye
   expect(longs("admin workspaces plan")).toContain("--data");
 });
 
-test("admin 1.7 CRM commands are wired under `ft admin crm`", () => {
+test("admin 1.8 CRM commands are wired under `ft admin crm`", () => {
   const tree = new Map(walk(program));
   const expected = [
     "admin crm campaigns list",

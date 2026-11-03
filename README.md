@@ -170,15 +170,18 @@ ft admin crm launch --data @campaign.json [--ignore-window] [--yes]
 audience preview with the same filter and sender (total, how many have email
 or reachable WhatsApp, the estimated days at the daily quota); the others show
 the campaign — and then ask for confirmation. Without a TTY they refuse unless
-you pass `--yes`. The CLI never retries a write on its own: if a `launch`
-times out, check `campaigns list` before launching again (the backend rejects
+you pass `--yes` (being in CI is not consent). The CLI never retries a write
+on its own: a 5xx or a dropped connection on a write is reported as "outcome
+unknown" — check `campaigns list` before running it again (the backend rejects
 the same channel + sender + subject within 10 minutes with
-`DUPLICATE_CAMPAIGN` and prints the existing id).
+`DUPLICATE_CAMPAIGN` and prints the existing id). A filter without
+`"version": 2` is refused before anything is sent.
 
 Named errors get a next step: `OUTSIDE_SEND_WINDOW` (WhatsApp sends only
 9:00-20:00 Bogotá) prints when the window opens and suggests `--ignore-window` (on `batches next`, and on a
 `launch` by WhatsApp with `timing.mode` `now`);
-`QUOTA_EXHAUSTED` prints when the quota frees up; `INVALID_STATE` means the
+`QUOTA_EXHAUSTED` prints when the quota frees up; `RATE_LIMITED` (429) says
+when to run it again by hand; `INVALID_STATE` means the
 campaign no longer allows that action; a 422 lists each `details[].path`; a 413 `PAYLOAD_TOO_LARGE` means the body is over
 256 KB.
 
