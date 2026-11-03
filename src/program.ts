@@ -66,6 +66,7 @@ import { registerAdmin } from "./commands/admin";
 import { registerApiKeys } from "./commands/api-keys";
 import { registerAuth } from "./commands/auth";
 import { registerEventDates } from "./commands/event-dates";
+import { registerMerch } from "./commands/merch";
 import { registerReports } from "./commands/reports";
 import { registerResource } from "./commands/resource";
 import { registerTickets } from "./commands/tickets";
@@ -427,6 +428,10 @@ registerResource(program, {
     },
   ],
 });
+
+// Merch store catalog (contract 1.38): products are born DRAFT; local photos
+// go through the signed upload URL, never as a URL the backend downloads.
+registerMerch(program);
 
 registerTickets(program);
 registerReports(program);
