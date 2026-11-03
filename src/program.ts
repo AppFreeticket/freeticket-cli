@@ -33,6 +33,7 @@ import {
   getTicketTypesId,
   getVenues,
   getVenuesId,
+  getWaitlist,
   getWebhooks,
   patchDiscountsId,
   patchEventsId,
@@ -57,6 +58,7 @@ import {
   postSubscriptionsIdCancel,
   postTicketTypes,
   postVenues,
+  postWaitlist,
   postWebhooks,
 } from "./client/sdk.gen";
 import { registerAccount } from "./commands/account";
@@ -425,6 +427,23 @@ registerResource(program, {
 });
 
 registerPresaleWindows(program);
+
+// Per-city waitlist of an enterprise landing (contract 1.24). `list` is the
+// staff export (ADMIN, personal data); `create` needs an enterprise service key.
+registerResource(program, {
+  name: "waitlist",
+  describe: "Per-city waitlist entries of an enterprise landing",
+  list: getWaitlist,
+  create: postWaitlist,
+  columns: ["id", "city", "name", "contact", "source", "createdAt"],
+  listFlags: [
+    {
+      flag: "--city <name>",
+      describe: "filter by city (accents/case ignored)",
+      query: "city",
+    },
+  ],
+});
 
 registerTickets(program);
 // Commands added to existing families (contract 1.25.0, see commands/ops.ts).

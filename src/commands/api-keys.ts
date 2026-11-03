@@ -3,7 +3,7 @@ import type { Command } from "commander";
 import { deleteApiKeysId, getApiKeys, postApiKeys } from "../client/sdk.gen";
 import type { ApiKeyScope } from "../client/types.gen";
 import { configureClient, fail, unwrap } from "../lib/api";
-import { confirmOrExit } from "../lib/input";
+import { confirmOrExit, parseLimit } from "../lib/input";
 import {
   print,
   printEmptyScope,
@@ -98,7 +98,7 @@ export function registerApiKeys(program: Command): void {
       configureClient(opts.workspace);
       const columns = resolveColumns(opts, COLUMNS);
       const query: Record<string, unknown> = {
-        limit: opts.limit,
+        limit: parseLimit(opts.limit),
         cursor: opts.cursor,
       };
 

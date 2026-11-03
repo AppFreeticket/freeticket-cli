@@ -3,6 +3,21 @@ import * as readline from "node:readline";
 import { fail } from "./api";
 
 /**
+ * Validates `--limit`: an integer 1-100, as the contract allows. Without this
+ * `--limit 500` or `--limit abc` went to the API as-is and came back as the
+ * default page of 20, silently.
+ */
+export function parseLimit(input: string): number {
+  const n = Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 100)
+    fail(
+      `Invalid --limit: ${input}. Use an integer from 1 to 100.`,
+      "For more rows, add --all to walk every page.",
+    );
+  return n;
+}
+
+/**
  * Parses a `--data` value into a JSON body. Accepts inline JSON (`'{"x":1}'`)
  * or `@path/to/file.json` to read from disk. Aborts on missing/invalid input.
  */
