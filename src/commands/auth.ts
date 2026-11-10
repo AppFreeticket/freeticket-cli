@@ -52,7 +52,7 @@ export function registerAuth(program: Command): void {
     )
     .option(
       "--read-only",
-      "ask for a read-only key (GET only; any write answers 403) and refuse to save one that is not",
+      "ask for a read-only key (GET only; any write answers 403) and refuse to save one that is not. Not a sandbox: the real gate is the person approving in the browser",
     )
     .option("--json", "raw JSON output (confirmation goes to stderr)")
     .action(async (opts) => {
@@ -76,13 +76,8 @@ export function registerAuth(program: Command): void {
         workspaceId,
       });
       const me = unwrap(await getMe({})).data;
-      // The box is pre-ticked but the person approving can untick it: never
-      // hand an agent a write key it asked not to have.
-      if (opts.readOnly && me.scope !== "read") {
-        fail(
-          "That key can write (the read-only box was unticked, or --key is a write key). Nothing was saved.",
-        );
-      }
+      const refusal = readOnlyRefusal(opts.readOnly, me.scope);
+      if (refusal) fail(refusal);
       // Adds this one account, or replaces the stored one of the same user;
       // every other login stays.
       const { name, replaces } = loginTarget(
@@ -279,13 +274,28 @@ export function registerAuth(program: Command): void {
     });
 }
 
-/** First characters of a credential: enough to tell two apart, not to use one. */
 export function withQuery(url: string, key: string, value: string): string {
   const u = new URL(url);
   u.searchParams.set(key, value);
   return u.toString();
 }
 
+/**
+ * `--read-only` refusal: the box is pre-ticked but the approver can untick it,
+ * `--key` can be a write key, and a server older than contract 1.43.0 sends no
+ * `scope`. All three fail closed: never hand an agent a write key it asked not
+ * to have. ponytail: the refused key stays live in the backend (nobody holds
+ * its secret); revoke it here if orphan "FreeTicket CLI" keys pile up.
+ */
+export function readOnlyRefusal(
+  readOnly: boolean | undefined,
+  scope: string | undefined,
+): string | null {
+  if (!readOnly || scope === "read") return null;
+  return "That key can write (the read-only box was unticked, or --key is a write key). Nothing was saved.";
+}
+
+/** First characters of a credential: enough to tell two apart, not to use one. */
 export function mask(secret: string): string {
   return `${secret.slice(0, 12)}…`;
 }
