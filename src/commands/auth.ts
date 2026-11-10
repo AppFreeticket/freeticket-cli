@@ -50,6 +50,10 @@ export function registerAuth(program: Command): void {
       "--workspace <id>",
       "pin this login to one workspace (default: every workspace the account reaches)",
     )
+    .option(
+      "--read-only",
+      "ask for a read-only key (GET only; any write answers 403) and refuse to save one that is not. Not a sandbox: the real gate is the person approving in the browser",
+    )
     .option("--json", "raw JSON output (confirmation goes to stderr)")
     .action(async (opts) => {
       const apiUrl: string =
@@ -59,7 +63,8 @@ export function registerAuth(program: Command): void {
         DEFAULT_API_URL;
 
       // Browser device flow is the default; --key stays for headless/CI.
-      const apiKey: string = opts.key ?? (await deviceLogin(apiUrl));
+      const apiKey: string =
+        opts.key ?? (await deviceLogin(apiUrl, opts.readOnly));
       const workspaceId: string | undefined = opts.workspace;
 
       // Verify the credential against /me before storing anything: a bad key
@@ -71,6 +76,8 @@ export function registerAuth(program: Command): void {
         workspaceId,
       });
       const me = unwrap(await getMe({})).data;
+      const refusal = readOnlyRefusal(opts.readOnly, me.scope);
+      if (refusal) fail(refusal);
       // Adds this one account, or replaces the stored one of the same user;
       // every other login stays.
       const { name, replaces } = loginTarget(
@@ -90,7 +97,8 @@ export function registerAuth(program: Command): void {
       );
       // stderr so `ft login --json | jq` stays parseable.
       console.error(
-        `${chalk.green("✓")} Account ${chalk.bold(name)} saved in ${chalk.dim(CONFIG_PATH)}`,
+        `${chalk.green("✓")} Account ${chalk.bold(name)} saved in ${chalk.dim(CONFIG_PATH)}` +
+          (me.scope === "read" ? chalk.yellow(" (read-only)") : ""),
       );
       const { activeAccount, accounts } = readConfig();
       if (activeAccount && activeAccount !== name) {
@@ -192,6 +200,7 @@ export function registerAuth(program: Command): void {
           account: m.account,
           email: m.email,
           name: m.name,
+          scope: m.scope,
           workspaces: m.workspaces.map((w) => w.slug).join(", "),
         })),
       );
@@ -265,6 +274,27 @@ export function registerAuth(program: Command): void {
     });
 }
 
+export function withQuery(url: string, key: string, value: string): string {
+  const u = new URL(url);
+  u.searchParams.set(key, value);
+  return u.toString();
+}
+
+/**
+ * `--read-only` refusal: the box is pre-ticked but the approver can untick it,
+ * `--key` can be a write key, and a server older than contract 1.43.0 sends no
+ * `scope`. All three fail closed: never hand an agent a write key it asked not
+ * to have. ponytail: the refused key stays live in the backend (nobody holds
+ * its secret); revoke it here if orphan "FreeTicket CLI" keys pile up.
+ */
+export function readOnlyRefusal(
+  readOnly: boolean | undefined,
+  scope: string | undefined,
+): string | null {
+  if (!readOnly || scope === "read") return null;
+  return "That key can write (the read-only box was unticked, or --key is a write key). Nothing was saved.";
+}
+
 /** First characters of a credential: enough to tell two apart, not to use one. */
 export function mask(secret: string): string {
   return `${secret.slice(0, 12)}…`;
@@ -300,7 +330,7 @@ function openBrowser(url: string): void {
  * the account's default one, which is what /api/v1 does when X-Workspace-Id is
  * absent. `ft workspace use <slug>` still pins on purpose.
  */
-async function deviceLogin(baseUrl: string): Promise<string> {
+async function deviceLogin(baseUrl: string, readOnly = false): Promise<string> {
   const apiUrl = baseUrl.replace(/\/$/, "");
   // Anonymous client: the device endpoints carry no auth header.
   client.setConfig({ baseUrl: `${apiUrl}/api/v1` });
@@ -312,7 +342,12 @@ async function deviceLogin(baseUrl: string): Promise<string> {
       `\n    ${chalk.bold(start.user_code)}\n` +
       `\n${chalk.dim("Opening your browser… (Ctrl+C to cancel)")}\n`,
   );
-  openBrowser(start.verification_uri_complete);
+  // Pre-ticks "Solo lectura" on /device; the login re-checks the key's scope.
+  openBrowser(
+    readOnly
+      ? withQuery(start.verification_uri_complete, "scope", "read")
+      : start.verification_uri_complete,
+  );
 
   const deadline = Date.now() + start.expires_in * 1000;
   let interval = start.interval;

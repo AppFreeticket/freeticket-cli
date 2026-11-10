@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FreeTicket B2B API",
-    "version": "1.42.0",
+    "version": "1.43.0",
     "description": "FreeTicket B2B REST API for integrations, the `ft` CLI and the FreeTicket MCP server. Authentication is by API key (`Authorization: Bearer <key>` header or `x-api-key`); the active workspace is selected with the `X-Workspace-Id` header.\n\nScopes: each key is either `read` (GET/HEAD only) or `write` (additionally creates, edits, deletes, cancels, refunds and checks in). Self-service keys are issued as `read`. A `read` key calling a mutating method gets a 403. The machine-readable declaration lives at `/.well-known/oauth-protected-resource` (RFC 9728).\n\nGetting a key (self-serve, no sales contact): `ft login` runs the Device Authorization Grant (RFC 8628, `POST /auth/device/code` + `POST /auth/device/token`); the user approves the code at https://admin.appfreeticket.com/device and the CLI receives a key. New organizers can bootstrap headless with `POST /auth/signup` (verify-first, then `ft login`). With a key, `POST /api-keys` mints more (born `read` unless `write` is requested). There is no sandbox environment: test against a dedicated workspace with `read` keys.\n\n## Versioning and deprecation\n\n- **Path version.** The B2B API is versioned in the path (`/api/v1`). A breaking change ships under a new path (`/api/v2`); the previous version keeps running in parallel until its sunset date.\n- **Contract version.** `info.version` is the semantic version of this document. MINOR = additive (new endpoints, new optional fields, new enum values, new error codes; clients must ignore unknown fields). PATCH = documentation or fixes that do not change shapes. The public API (`/api/public`) is pre-1.0 and not versioned in the path: there, a MINOR bump may include a breaking change and PATCH never does.\n- **Deprecation signals.** A deprecated operation is marked `deprecated: true` in this document and its responses carry `Deprecation` (RFC 9745, e.g. `Deprecation: @1767225600`), `Sunset` (RFC 8594, an HTTP-date after which the operation may stop working) and `Link: <https://appfreeticket.com/desarrolladores>; rel=\"deprecation\"`.\n- **Timeline.** At least 6 months between the first `Deprecation` header and the `Sunset` date for `/api/v1`, and at least 90 days for `/api/public`. A path version is only retired after all its operations have sunset.\n- **Current status.** No operation is deprecated today.\n\n## Rate limits\n\n- **429 always carries `Retry-After`** (seconds). Wait at least that long before retrying the same request. The JSON error envelope comes with `error.retryable: true`; most rate-limited responses use `error.code: \"RATE_LIMITED\"`, and some return a more specific code (for example `TOO_MANY_REQUESTS` or `SEAT_BUDGET_EXHAUSTED`).\n- **RateLimit headers are sent where listed below.** Those endpoints answer every response, success or error, with the IETF RateLimit headers (draft-ietf-httpapi-ratelimit-headers): `RateLimit-Policy: \"<policy>\";q=<quota>;w=<window seconds>` and `RateLimit: \"<policy>\";r=<remaining>;t=<seconds until reset>`. Other endpoints may answer 429 without them.\n- Counters are fixed windows kept per server instance: treat the numbers as pacing hints, not as a global account quota.\n\nEndpoints that send RateLimit headers today: `POST /auth/signup` (per client IP), `POST /customer/auth/request` and `POST /customer/auth/verify` (per client IP), and the buyer-session endpoints `GET /customer/orders/{id}`, `POST /customer/orders/{id}/payment`, `/payment/card`, `/payment/pse`, `/release`, `POST /customer/purchase-sessions` and `POST /customer/purchase-sessions/{id}/release`."
   },
   "servers": [
@@ -23997,6 +23997,14 @@
             "items": {
               "$ref": "#/components/schemas/WorkspaceAccess"
             }
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write"
+            ],
+            "description": "Scope of the API key in use. `read` = only GET/HEAD; any mutating method answers 403."
           }
         },
         "required": [
@@ -24005,7 +24013,8 @@
           "email",
           "role",
           "activeWorkspaceId",
-          "workspaces"
+          "workspaces",
+          "scope"
         ],
         "additionalProperties": false
       },
