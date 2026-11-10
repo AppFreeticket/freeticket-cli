@@ -58,6 +58,8 @@ const product = (over: Partial<MerchAdminProduct> = {}): MerchAdminProduct => ({
   imageUrls: [],
   options: [],
   maxPerOrder: 10,
+  maxPerCustomer: null,
+  membersOnly: false,
   sortOrder: 0,
   publishedAt: null,
   createdAt: "2026-11-03T00:00:00.000Z",
