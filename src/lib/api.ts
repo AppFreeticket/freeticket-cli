@@ -71,23 +71,37 @@ export function configureClient(
 }
 
 /**
- * Configures the superadmin client (/api/admin). Auth is a better-auth session
- * cookie of a SUPER_ADMIN — NOT an API key (the admin contract issues no keys).
- * MVP: paste the session token via FT_ADMIN_SESSION; converges to a service
- * token once the backend ships it (see free-admin#157).
- * ponytail: cookie header until the Bearer service-token lands.
+ * Configures the superadmin client (/api/admin). Two credentials, in order:
+ *
+ * 1. `FT_ADMIN_TOKEN` — a platform service token (PAT, minted with
+ *    `ft admin tokens create`), sent as `Authorization: Bearer`. The headless
+ *    path for CI and scripts. With a Bearer present the backend never falls
+ *    back to the cookie, so a bad token is a 401, not a silent session.
+ * 2. The SUPER_ADMIN better-auth session cookie (`FT_ADMIN_SESSION` or
+ *    `ft admin login`).
  */
 export function configureAdminClient(): void {
   const cfg = loadConfig();
+  const baseUrl = `${cfg.apiUrl.replace(/\/$/, "")}/api/admin`;
+  const token = process.env.FT_ADMIN_TOKEN?.trim();
+  if (token) {
+    adminClient.setConfig({
+      baseUrl,
+      // setConfig merges headers: null drops a credential left by an earlier call.
+      headers: { Authorization: `Bearer ${token}`, Cookie: null },
+    });
+    return;
+  }
   if (!cfg.adminSession) {
     fail(
-      "No superadmin session. Export FT_ADMIN_SESSION with a SUPER_ADMIN better-auth session token.",
-      "Log in to the admin panel in your browser and copy the `better-auth.session_token` cookie.",
+      "No superadmin credential. Export FT_ADMIN_TOKEN with a service token, or FT_ADMIN_SESSION with a SUPER_ADMIN better-auth session token.",
+      "Mint a token with `ft admin tokens create`, or log in to the admin panel and copy the `better-auth.session_token` cookie (`ft admin login --session <token>`).",
     );
   }
   adminClient.setConfig({
-    baseUrl: `${cfg.apiUrl.replace(/\/$/, "")}/api/admin`,
+    baseUrl,
     headers: {
+      Authorization: null,
       Cookie: `better-auth.session_token=${cfg.adminSession}`,
     },
   });
@@ -140,7 +154,9 @@ export function unwrap<T>(res: {
     const lines = [
       `Error ${status ?? ""} [${err.code ?? "?"}]: ${err.message ?? "unknown failure"}`.trim(),
     ];
-    for (const d of err.details ?? [])
+    // `details` is a list of field errors on a 422, but an object elsewhere
+    // (e.g. `{ existingId }` on a duplicate): only the list is printable.
+    for (const d of Array.isArray(err.details) ? err.details : [])
       lines.push(`  · ${d.path ?? ""}: ${d.message ?? ""}`.trimEnd());
     fail(lines.join("\n"), hintFor(status));
   }
