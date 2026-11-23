@@ -45,6 +45,7 @@ import {
   patchWebhooksId,
   postContentPlaybackToken,
   postContentPosts,
+  postCourtesyRequests,
   postDiscounts,
   postEvents,
   postEventsIdCancel,
@@ -143,13 +144,29 @@ registerResource(program, {
   describe: "Settlements paid to the organizer",
   list: getSettlements,
   get: getSettlementsId,
-  columns: ["id", "reference", "status", "amount", "currency", "createdAt"],
+  // `kind` (contract 1.54): EVENT settlements of ticket sales or MEMBERSHIP
+  // ones of a period; membership rows carry `period`/`membershipPlan` instead
+  // of `event`/`eventDate`.
+  columns: [
+    "id",
+    "reference",
+    "kind",
+    "status",
+    "amount",
+    "currency",
+    "createdAt",
+  ],
   listFlags: [
     { flag: "--event <id>", describe: "filter by event", query: "event" },
     {
       flag: "--status <s>",
       describe: "SENT | AWAITING_PAYMENT | PAID",
       query: "status",
+    },
+    {
+      flag: "--kind <k>",
+      describe: "EVENT | MEMBERSHIP (default: both)",
+      query: "kind",
     },
   ],
   extend: (root) => {
@@ -427,6 +444,16 @@ registerResource(program, {
       query: "city",
     },
   ],
+});
+
+// Courtesy invitation requests of an enterprise landing (contract 1.55): same
+// shape as the waitlist's `create` (enterprise service key; the org comes from
+// the key). One per (organization, email): a resubmit answers 409. The list and
+// CSV export live only in the dashboard (/dashboard/cortesias).
+registerResource(program, {
+  name: "courtesy-requests",
+  describe: "Courtesy invitation requests of an enterprise landing",
+  create: postCourtesyRequests,
 });
 
 // Merch store catalog (contract 1.38): products are born DRAFT; local photos

@@ -9,6 +9,8 @@ import {
   getMe,
   getPlatformPlans,
   getPlatformPlansId,
+  getSettlements,
+  getSettlementsId,
   getTokens,
   getUsers,
   getUsersId,
@@ -32,6 +34,8 @@ import { configureAdminClient, unwrap } from "../lib/api";
 import { CONFIG_PATH, loadConfig, saveConfig } from "../lib/config";
 import { confirmOrExit, parseData, parseLimit } from "../lib/input";
 import { print, printNextCursor, resolveColumns, toCsv } from "../lib/output";
+import { registerAdminCrm } from "./admin-crm";
+import { registerAdminSettlementWrites } from "./admin-settlements";
 
 type SdkFn = (
   opts: any,
@@ -63,6 +67,8 @@ interface AdminResource {
   listFlags?: { flag: string; describe: string; query: string }[];
   /** This list endpoint has no cursor pagination (e.g. feature-flags). */
   noPaging?: boolean;
+  /** Extra subcommands under the resource root (e.g. settlement writes). */
+  extend?: (root: Command) => void;
 }
 
 /**
@@ -284,6 +290,31 @@ export function registerAdmin(program: Command): void {
       noPaging: true,
     },
     {
+      // Admin 1.9: EVENT settlements of every organization (membership ones
+      // are not listed here, same as the panel). Every write moves money or
+      // notifies the organizer, so they live in admin-settlements.ts behind a
+      // confirmation that also sends the contract's `confirm: true`.
+      name: "settlements",
+      describe: "Organizer settlements, cross-tenant (writes move money)",
+      list: getSettlements,
+      get: getSettlementsId,
+      columns: ["id", "reference", "status", "amount", "currency", "createdAt"],
+      listFlags: [
+        {
+          flag: "--status <s>",
+          describe:
+            "DRAFT | GENERATED | SENT | AWAITING_PAYMENT | PAID | REQUESTED | PENDING | REJECTED",
+          query: "status",
+        },
+        {
+          flag: "--organization <id>",
+          describe: "only this organization's",
+          query: "organizationId",
+        },
+      ],
+      extend: registerAdminSettlementWrites,
+    },
+    {
       name: "audit-log",
       describe: "Superadmin audit log",
       list: getAuditLog,
@@ -298,6 +329,8 @@ export function registerAdmin(program: Command): void {
   ];
 
   for (const spec of resources) registerAdminResource(admin, spec);
+
+  registerAdminCrm(admin);
 }
 
 function registerAdminResource(parent: Command, spec: AdminResource): void {
@@ -331,7 +364,9 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
         query.cursor = opts.cursor;
       }
       for (const f of spec.listFlags ?? []) {
-        const v = opts[camel(f.query)];
+        // Read the value by the flag's own name: `--workspace <id>` lands in
+        // opts.workspace even though it travels as `workspaceId`.
+        const v = opts[flagKey(f.flag)];
         if (v !== undefined) query[f.query] = v;
       }
       const columns = resolveColumns(opts, spec.columns);
@@ -440,8 +475,14 @@ function registerAdminResource(parent: Command, spec: AdminResource): void {
       print(body?.data ?? body ?? { ok: true }, { json: opts.json });
     });
   }
+
+  spec.extend?.(root);
 }
 
-function camel(s: string): string {
-  return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+/** `--organization <id>` → `organization`, `--with-total` → `withTotal`. */
+export function flagKey(flag: string): string {
+  const long = flag.split(/[ ,]/).find((p) => p.startsWith("--")) ?? flag;
+  return long
+    .replace(/^--/, "")
+    .replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
