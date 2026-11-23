@@ -289,6 +289,11 @@ ft admin settlements mark-paid <id> --proof a.pdf --proof b.pdf [--yes]  # AWAIT
 ft admin settlements delete <id> [--yes]
 ```
 
+`get` and `list` cover event settlements only; a membership settlement id
+returns 404 there. The organizer email on `send` and `mark-paid` is
+best-effort: a 200 means the state changed, not that the email arrived, and a
+retry returns 409 `INVALID_STATE` instead of resending.
+
 **Every write moves money or notifies the organizer.** Each one shows the
 settlement (or the body it will create) and asks; without a TTY it refuses
 unless you pass `--yes`. `send`, `mark-paid` and `delete` send the contract's
