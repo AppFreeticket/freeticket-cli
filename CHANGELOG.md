@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0
+
+### Minor Changes
+
+- 8fdc309: New `ft admin crm` commands for the master CRM (admin contract 1.7.0): list and inspect campaigns, search shows and dates, read options and the WhatsApp quota, preview an audience, launch a campaign (`--ignore-window` to send WhatsApp now outside 9:00-20:00), send or stop WhatsApp batches and cancel a scheduled campaign. Every write previews its target and asks for confirmation (`--yes` in scripts), none is retried automatically, and `PAYLOAD_TOO_LARGE` (413) is explained.
+- b47f060: `ft admin` authenticates with a platform service token: set `FT_ADMIN_TOKEN` and it is sent as `Authorization: Bearer`, ahead of the session cookie.
+- 8771411: Contract sync to v1 1.55.0 and admin 1.9.0. New `ft admin settlements` (list, get, upload, create, regenerate, attach, send, mark-paid, delete) for organizer settlements across workspaces; every write shows the settlement, asks for confirmation (`--yes` in scripts) and sends `confirm: true`. New `ft admin crm test-send`, `suppressions list|add|remove`, `organizations` and `people search`. New `ft courtesy-requests create` for enterprise landings, and `ft settlements list --kind EVENT|MEMBERSHIP` with a `kind` column. Fixes `ft admin users list --workspace` and `ft admin audit-log list --actor`, which were silently ignored.
+
 ## 0.14.0
 
 ### Minor Changes
