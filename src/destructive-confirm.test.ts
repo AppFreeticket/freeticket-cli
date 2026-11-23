@@ -24,6 +24,16 @@ const sdk = vi.hoisted(() => ({
   postCrmCampaignsIdBatchesStop: vi.fn(),
   postCrmAudiencePreview: vi.fn(),
   getCrmCampaignsId: vi.fn(),
+  deleteCrmSuppressions: vi.fn(),
+  postCrmTestSend: vi.fn(),
+  // Settlement writes (admin 1.9), plus the read they show first.
+  getSettlementsId: vi.fn(),
+  postSettlements: vi.fn(),
+  postSettlementsIdRegenerate: vi.fn(),
+  postSettlementsIdProofs: vi.fn(),
+  postSettlementsIdSend: vi.fn(),
+  postSettlementsIdMarkPaid: vi.fn(),
+  deleteSettlementsId: vi.fn(),
 }));
 
 const PREVIEW = {
@@ -70,6 +80,15 @@ vi.mock("./admin-client/sdk.gen", async (importOriginal) => ({
   postCrmCampaignsIdBatchesStop: sdk.postCrmCampaignsIdBatchesStop,
   postCrmAudiencePreview: sdk.postCrmAudiencePreview,
   getCrmCampaignsId: sdk.getCrmCampaignsId,
+  deleteCrmSuppressions: sdk.deleteCrmSuppressions,
+  postCrmTestSend: sdk.postCrmTestSend,
+  getSettlementsId: sdk.getSettlementsId,
+  postSettlements: sdk.postSettlements,
+  postSettlementsIdRegenerate: sdk.postSettlementsIdRegenerate,
+  postSettlementsIdProofs: sdk.postSettlementsIdProofs,
+  postSettlementsIdSend: sdk.postSettlementsIdSend,
+  postSettlementsIdMarkPaid: sdk.postSettlementsIdMarkPaid,
+  deleteSettlementsId: sdk.deleteSettlementsId,
 }));
 
 const { program } = await import("./program");
@@ -191,6 +210,103 @@ describe("ft admin crm writes refuse without a TTY and without --yes", () => {
     // It got as far as showing the target (preview / campaign)...
     expect(read).toHaveBeenCalledTimes(1);
     // ...and the exit is the confirmation gate, not anything earlier.
+    const messages = stderr.mock.calls.map((c) => String(c[0]));
+    expect(messages.some((m) => /^Refusing: .*no TTY to confirm/.test(m))).toBe(
+      true,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+});
+
+describe("ft admin crm/settlements money and re-enable writes refuse without a TTY and without --yes", () => {
+  const tty = process.stdin.isTTY;
+  const env = { ...process.env };
+  let exit: MockInstance<typeof process.exit>;
+  let stderr: MockInstance<typeof console.error>;
+
+  beforeEach(() => {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+    process.env.FT_ADMIN_TOKEN = "ftpat_test";
+    sdk.getSettlementsId.mockResolvedValue({
+      data: {
+        data: {
+          id: "stl_1",
+          reference: "LQ-EVT-X",
+          label: "F1",
+          status: "GENERATED",
+          amount: 1000,
+          currency: "COP",
+          organization: { id: "org_1", name: "Teatro", taxId: null },
+          event: null,
+          eventDate: null,
+        },
+      },
+      response: new Response(),
+    });
+    stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+    exit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exited");
+    }) as never);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: tty,
+      configurable: true,
+    });
+    process.env = { ...env };
+    vi.restoreAllMocks();
+    for (const fn of Object.values(sdk)) fn.mockReset();
+  });
+
+  it.each([
+    [["crm", "suppressions", "remove", "a@x.co"], sdk.deleteCrmSuppressions],
+    [
+      ["crm", "test-send", "--data", '{"channel":"EMAIL"}'],
+      sdk.postCrmTestSend,
+    ],
+    [
+      [
+        "settlements",
+        "create",
+        "--data",
+        '{"mode":"auto","eventDateId":"ed_1"}',
+      ],
+      sdk.postSettlements,
+    ],
+    [["settlements", "regenerate", "stl_1"], sdk.postSettlementsIdRegenerate],
+    [
+      [
+        "settlements",
+        "attach",
+        "stl_1",
+        "--storage-path",
+        "p",
+        "--file-name",
+        "f.pdf",
+      ],
+      sdk.postSettlementsIdProofs,
+    ],
+    [["settlements", "send", "stl_1"], sdk.postSettlementsIdSend],
+    [
+      [
+        "settlements",
+        "mark-paid",
+        "stl_1",
+        "--proofs",
+        '[{"storagePath":"p","fileName":"f.pdf"}]',
+      ],
+      sdk.postSettlementsIdMarkPaid,
+    ],
+    [["settlements", "delete", "stl_1"], sdk.deleteSettlementsId],
+  ])("ft admin %j exits 1 and never calls the write", async (args, write) => {
+    await expect(
+      program.parseAsync(["node", "ft", "admin", ...(args as string[])]),
+    ).rejects.toThrow("exited");
+    expect(exit).toHaveBeenCalledWith(1);
     const messages = stderr.mock.calls.map((c) => String(c[0]));
     expect(messages.some((m) => /^Refusing: .*no TTY to confirm/.test(m))).toBe(
       true,

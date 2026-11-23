@@ -17,6 +17,12 @@ const sdk = vi.hoisted(() => ({
   postCrmAudiencePreview: vi.fn(),
   postCrmCampaigns: vi.fn(),
   postCrmCampaignsIdBatchesNext: vi.fn(),
+  getCrmSuppressions: vi.fn(),
+  postCrmSuppressions: vi.fn(),
+  deleteCrmSuppressions: vi.fn(),
+  postCrmTestSend: vi.fn(),
+  getCrmOrganizations: vi.fn(),
+  postCrmPeopleSearch: vi.fn(),
 }));
 
 vi.mock("../admin-client/sdk.gen", async (importOriginal) => ({
@@ -93,14 +99,20 @@ describe("ft admin crm command tree", () => {
       "events",
       "launch",
       "options",
+      "organizations",
+      "people",
       "preview",
       "quota",
+      "suppressions",
+      "test-send",
     ]);
     const sub = (n: string) =>
       crm.commands.find((c) => c.name() === n) as Command;
     expect(names(sub("campaigns"))).toEqual(["cancel", "get", "list"]);
     expect(names(sub("batches"))).toEqual(["next", "stop"]);
     expect(names(sub("events"))).toEqual(["dates", "search"]);
+    expect(names(sub("suppressions"))).toEqual(["add", "list", "remove"]);
+    expect(names(sub("people"))).toEqual(["search"]);
   });
 
   it("puts every write behind --yes", () => {
@@ -115,6 +127,8 @@ describe("ft admin crm command tree", () => {
       ["campaigns", "cancel"],
       ["batches", "next"],
       ["batches", "stop"],
+      ["suppressions", "remove"],
+      ["test-send"],
     ])
       expect(find(p).options.map((o) => o.long)).toContain("--yes");
     for (const p of [["batches", "next"], ["launch"]])
@@ -435,6 +449,118 @@ describe("ft admin crm commands", () => {
     expect(err).toContain("opens");
     expect(err).toContain("in 1h 0m");
     expect(err).toContain("--ignore-window");
+  });
+
+  it("suppressions list validates and passes query, scope and limit", async () => {
+    sdk.getCrmSuppressions.mockResolvedValue(ok([]));
+    await run(
+      "suppressions",
+      "list",
+      "--query",
+      "ana@",
+      "--scope",
+      "ALL",
+      "--limit",
+      "200",
+      "--json",
+    );
+    expect(sdk.getCrmSuppressions).toHaveBeenCalledWith({
+      query: { query: "ana@", scope: "all", limit: 200 },
+    });
+  });
+
+  it("suppressions list rejects --limit over 500 before calling", async () => {
+    await expect(run("suppressions", "list", "--limit", "501")).rejects.toThrow(
+      "exited",
+    );
+    expect(sdk.getCrmSuppressions).not.toHaveBeenCalled();
+  });
+
+  it("suppressions add posts the trimmed email without asking", async () => {
+    sdk.postCrmSuppressions.mockResolvedValue(
+      ok({ emailMasked: "a***@x.co", suppressed: true }),
+    );
+    await run("suppressions", "add", " ana@x.co ", "--json");
+    expect(sdk.postCrmSuppressions).toHaveBeenCalledWith({
+      body: { email: "ana@x.co" },
+    });
+  });
+
+  it("suppressions remove --yes sends confirm: true in the DELETE body", async () => {
+    sdk.deleteCrmSuppressions.mockResolvedValue(
+      ok({ emailMasked: "a***@x.co", suppressed: false }),
+    );
+    await run("suppressions", "remove", "ana@x.co", "--yes", "--json");
+    expect(sdk.deleteCrmSuppressions).toHaveBeenCalledWith({
+      body: { email: "ana@x.co", confirm: true },
+    });
+  });
+
+  it("test-send --yes adds confirm: true and --sender wins over --data", async () => {
+    sdk.postCrmTestSend.mockResolvedValue(ok({ to: "me@freeticket.co" }));
+    const msg = {
+      channel: "EMAIL",
+      sender: { kind: "freeticket" },
+      subject: "Hola",
+      body: "Hi",
+    };
+    await run(
+      "test-send",
+      "--data",
+      JSON.stringify(msg),
+      "--sender",
+      "ws_1",
+      "--yes",
+      "--json",
+    );
+    expect(sdk.postCrmTestSend).toHaveBeenCalledWith({
+      body: {
+        ...msg,
+        sender: { kind: "organization", workspaceId: "ws_1" },
+        confirm: true,
+      },
+    });
+    expect(JSON.parse(stdout)).toEqual({ to: "me@freeticket.co" });
+  });
+
+  it("test-send SEND_FAILED explains nothing reached customers", async () => {
+    sdk.postCrmTestSend.mockResolvedValue(
+      apiError(502, { code: "SEND_FAILED", message: "Proveedor rechazó." }),
+    );
+    await expect(
+      run("test-send", "--data", '{"channel":"EMAIL"}', "--yes"),
+    ).rejects.toThrow("exited");
+    expect(stderr.join("\n")).toContain("nothing went to any customer");
+  });
+
+  it("organizations sends the optional query", async () => {
+    sdk.getCrmOrganizations.mockResolvedValue(ok([]));
+    await run("organizations", "teatro", "--json");
+    expect(sdk.getCrmOrganizations).toHaveBeenCalledWith({
+      query: { query: "teatro" },
+    });
+    await run("organizations", "--json");
+    expect(sdk.getCrmOrganizations).toHaveBeenLastCalledWith({ query: {} });
+  });
+
+  it("people search posts query and the parsed --scope", async () => {
+    sdk.postCrmPeopleSearch.mockResolvedValue(
+      ok([{ email: "ana@x.co", name: "A.", phoneMasked: null }]),
+    );
+    await run(
+      "people",
+      "search",
+      "ana",
+      "--scope",
+      '{"level":"orgs","workspaceIds":["ws_1"]}',
+      "--json",
+    );
+    expect(sdk.postCrmPeopleSearch).toHaveBeenCalledWith({
+      body: {
+        query: "ana",
+        scope: { level: "orgs", workspaceIds: ["ws_1"] },
+      },
+    });
   });
 
   it("422 lists details[].path", async () => {

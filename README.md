@@ -119,16 +119,18 @@ ft sales list --status CONFIRMED --json
 | `ft reports by-event` · `timeseries` · `inventory` | Revenue/tickets by event, over time, and capacity/availability | VIEWER |
 | `ft reports export buyers\|attendees\|subscribers\|reconciliation` | Exports as CSV (filters `--event` `--event-date` `--from` `--to` `--status`) | ADMIN |
 | `ft reports reconciliation` · `financials` | CFO reconciliation (Mercado Pago vs sale vs Siigo invoice) · per-function P&L | ADMIN |
-| `ft settlements list` · `get <id>` · `document <id>` | Settlements paid to the organizer · signed download URL for the PDF, 5 min TTL (`--proof <fileName>` for a payment proof) | ADMIN |
+| `ft settlements list` · `get <id>` · `document <id>` | Settlements paid to the organizer (`--kind EVENT\|MEMBERSHIP`, `--event`, `--status`; membership rows carry `period` / `membershipPlan`) · signed download URL for the PDF, 5 min TTL (`--proof <fileName>` for a payment proof) | ADMIN |
 | `ft content-videos list` · `content-posts list\|create` · `content-lives list\|get\|playback-token` | Organization content; `content-posts create --data` publishes a post or article | ADMIN |
 | `ft waitlist list [--city <name>]` · `waitlist create --data` | Per-city waitlist of an enterprise landing (export with personal data); `create` needs an enterprise service key | ADMIN |
+| `ft courtesy-requests create --data '{"fullName":"…","email":"…","companion":{"fullName":"…"}}'` | Courtesy invitation request from an enterprise landing (enterprise service key; one per email, a resubmit is 409). The list lives in the dashboard (`/dashboard/cortesias`) | service key |
 | `ft merch products list` | Merch store products of the workspace's organization, DRAFT and PUBLISHED, with variants (Legend plan) | ADMIN / MERCH_MANAGER |
 | `ft merch products create` | Create product(s) as DRAFT: `--name` `--price <cop>` `--sizes XS,S,M` `--stock <n>` `--image <path>` (repeatable, uploaded through a signed URL) `--publish`; `--from-json <file>` for several (image paths relative to the file, no symlinks). The whole batch is validated first; `--json` prints `{ created, failed }` | ADMIN / MERCH_MANAGER |
 | `ft merch products images <id> --image <path>…` | Replace a product's photos with local files (repairs a partial `create`) | ADMIN / MERCH_MANAGER |
 | `ft merch products publish <id>` · `unpublish <id>` | Show / hide a product in the store (publishing needs the store setup done and an active variant) | ADMIN / MERCH_MANAGER |
 | `ft api-keys create <name>` · `list` · `revoke <id>` | Self-service API keys (the secret is shown once, never stored) | ADMIN |
 | `ft admin login` · `me` · `workspaces` · `users` · `plans` · `feature-flags` · `tokens` · `audit-log` | Superadmin, cross-tenant — needs a SUPER_ADMIN session, not an API key. Includes `admin workspaces plan <id>` (assisted plan assignment), `plan-show <id>` (current plan) and `delete <id>` (soft delete; suspend first) and `webTemplate` / `customDomain` on `update` | SUPER_ADMIN |
-| `ft admin crm campaigns` · `batches` · `events` · `options` · `quota` · `preview` · `launch` | Master CRM: email / WhatsApp campaigns to buyers across workspaces. See [`ft admin crm`](#ft-admin-crm) | SUPER_ADMIN |
+| `ft admin settlements list` · `get` · `upload` · `create` · `regenerate` · `attach` · `send` · `mark-paid` · `delete` | Organizer settlements across workspaces: create, send, mark as paid. See [`ft admin settlements`](#ft-admin-settlements) | SUPER_ADMIN |
+| `ft admin crm campaigns` · `batches` · `events` · `options` · `quota` · `preview` · `launch` · `test-send` · `suppressions` · `organizations` · `people search` | Master CRM: email / WhatsApp campaigns to buyers across workspaces. See [`ft admin crm`](#ft-admin-crm) | SUPER_ADMIN |
 
 > **Write operations** (`create`/`update`/`delete` and actions like `publish`,
 > `cancel`, `refund`) send a JSON body via `--data <inline-json>` or
@@ -167,7 +169,23 @@ ft admin crm options
 ft admin crm quota
 ft admin crm preview --filter @filter.json [--sender freeticket|<workspaceId>]
 ft admin crm launch --data @campaign.json [--ignore-window] [--yes]
+ft admin crm test-send --data @message.json [--sender freeticket|<workspaceId>] [--yes]
+ft admin crm suppressions list [--query <email part>] [--scope global|all] [--limit 1-500]
+ft admin crm suppressions add <email>
+ft admin crm suppressions remove <email> [--yes]
+ft admin crm organizations [query]
+ft admin crm people search <query> [--scope '{"level":"orgs","workspaceIds":["…"]}']
 ```
+
+`test-send` sends the composed message, with subject `[Prueba]`, to **you**:
+your email, or by WhatsApp the phone on your staff profile (it uses 1 of the
+daily WhatsApp quota). It takes the same fields as `launch` minus the filter
+and timing, asks first and sends `confirm: true`. `suppressions add` stops a
+person from getting master CRM campaigns (idempotent; it does not touch an
+organizer's own campaigns); `suppressions remove` re-enables them, asks first,
+and only works on unsubscribes the team added (`reason: admin`). `people
+search` returns the full email (what the filter's `people` condition takes);
+`organizations` gives ids for `scope.level: "orgs"` or `sender.workspaceId`.
 
 **Writes send real messages.** `launch`, `campaigns cancel`, `batches next` and
 `batches stop` first show what they are about to touch — `launch` runs the
@@ -251,6 +269,36 @@ cities, genre/format codes, plans and WhatsApp templates with `options`.
   or `batches` (WhatsApp only, daily cap 150 when FreeTicket signs, 200 for an
   organization). WhatsApp times are moved into the 9:00-20:00 Bogotá window;
   the response's `scheduledAt` is the real one.
+
+## `ft admin settlements`
+
+Settlements of every organization for the internal team, against
+`/api/admin/settlements` (admin contract 1.9). Same SUPER_ADMIN credential as
+`ft admin crm`. `list` shows EVENT settlements only, like the panel.
+
+```bash
+ft admin settlements list [--status S] [--organization <id>] [--all]
+ft admin settlements get <id>
+ft admin settlements upload <file.pdf> --organization <id>     # prints storagePath
+ft admin settlements create --data '{"mode":"auto","eventDateId":"…"}' [--yes]
+ft admin settlements create --data @manual.json --pdf liquidacion.pdf [--yes]
+ft admin settlements regenerate <id> [--commission-rate 2.9916] [--fixed-fee 500] [--yes]
+ft admin settlements attach <id> --pdf <file> [--amount N] [--yes]   # legacy DRAFT → GENERATED
+ft admin settlements send <id> [--yes]                               # GENERATED → SENT, emails the organizer
+ft admin settlements mark-paid <id> --proof a.pdf --proof b.pdf [--yes]  # AWAITING_PAYMENT → PAID
+ft admin settlements delete <id> [--yes]
+```
+
+**Every write moves money or notifies the organizer.** Each one shows the
+settlement (or the body it will create) and asks; without a TTY it refuses
+unless you pass `--yes`. `send`, `mark-paid` and `delete` send the contract's
+`confirm: true` (`attach` only with `--amount`). PDFs (max 3 MB, checked for
+`%PDF` locally) go up with `POST /settlements/files` after you confirm;
+`--pdf` / `--proof` do that for you, or pass an already uploaded `storagePath`
+(`attach --storage-path`, `mark-paid --proofs '[{"storagePath":…,"fileName":…}]'`).
+`create` starts in GENERATED and does not notify anyone; a function with an
+active settlement answers `DUPLICATE_SETTLEMENT` with the existing id. Nothing
+is retried automatically.
 
 ## Configuration
 

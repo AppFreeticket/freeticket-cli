@@ -1,24 +1,32 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 import {
+  deleteCrmSuppressions,
   getCrmCampaigns,
   getCrmCampaignsId,
   getCrmEventDates,
   getCrmEvents,
   getCrmOptions,
+  getCrmOrganizations,
   getCrmQuota,
+  getCrmSuppressions,
   postCrmAudiencePreview,
   postCrmCampaigns,
   postCrmCampaignsIdBatchesNext,
   postCrmCampaignsIdBatchesStop,
   postCrmCampaignsIdCancel,
+  postCrmPeopleSearch,
+  postCrmSuppressions,
+  postCrmTestSend,
 } from "../admin-client/sdk.gen";
 import type {
   AdminCrmAudienceFilter,
   AdminCrmAudiencePreview,
   AdminCrmCampaignDetail,
   AdminCrmLaunchInput,
+  AdminCrmPeopleSearchInput,
   AdminCrmSender,
+  AdminCrmTestSendInput,
 } from "../admin-client/types.gen";
 import { configureAdminClient, fail, unwrap } from "../lib/api";
 import { confirmOrExit, parseData } from "../lib/input";
@@ -73,6 +81,18 @@ const DATE_COLUMNS = [
   "past",
   "buyers",
 ];
+
+const SUPPRESSION_COLUMNS = [
+  "emailMasked",
+  "reason",
+  "isGlobal",
+  "workspaceId",
+  "createdAt",
+];
+
+const ORGANIZATION_COLUMNS = ["id", "name", "slug"];
+
+const PERSON_COLUMNS = ["email", "name", "phoneMasked"];
 
 type SdkResult<T> = { data?: T; error?: unknown; response: Response };
 
@@ -150,6 +170,14 @@ export function crmErrorHint(
       return "WhatsApp sending is blocked for this template or sender. See `whatsappBlockedReason` in `ft admin crm options`.";
     case "PAYLOAD_TOO_LARGE":
       return PAYLOAD_HINT;
+    case "CONFIRMATION_REQUIRED":
+      return "The backend wants an explicit confirmation. The CLI sends `confirm: true` after you answer yes or pass --yes; if you built the body by hand, add it.";
+    case "SEND_FAILED":
+      return "The provider rejected the test message. Check the template, the sender and your profile's email/phone; nothing went to any customer.";
+    case "RATE_LIMITED":
+      return retryAfter !== undefined
+        ? `Too many requests. Wait ${retryAfter}s and run it again (the CLI never retries a write on its own).`
+        : "Too many requests. Wait a moment and run it again (the CLI never retries a write on its own).";
     case "WHATSAPP_UNAVAILABLE":
       return "The WhatsApp provider did not answer. Safe to retry by hand in a moment - the CLI never retries a write on its own.";
     default:
@@ -157,11 +185,20 @@ export function crmErrorHint(
   }
 }
 
+export type ErrorHint = (
+  err: CrmError,
+  retryAfter: number | undefined,
+) => string | null;
+
 /**
- * `unwrap` plus the CRM's named errors. Formats the envelope itself because
+ * `unwrap` plus the named errors of a superadmin surface (CRM by default;
+ * settlements pass their own `hint`). Formats the envelope itself because
  * `details` is not always a list here (`{ existingId }` on a duplicate).
  */
-function crmUnwrap<T>(res: SdkResult<T>): T {
+export function crmUnwrap<T>(
+  res: SdkResult<T>,
+  hint: ErrorHint = crmErrorHint,
+): T {
   if (res.data !== undefined) return res.data;
   const err = (res.error as { error?: CrmError } | undefined)?.error;
   const status = res.response?.status;
@@ -180,8 +217,8 @@ function crmUnwrap<T>(res: SdkResult<T>): T {
       lines.push(`  · ${path}: ${d.message ?? ""}`.trimEnd());
     }
   }
-  const hint = crmErrorHint(err, retryAfterSeconds(res.response));
-  if (hint) fail(lines.join("\n"), hint);
+  const next = hint(err, retryAfterSeconds(res.response));
+  if (next) fail(lines.join("\n"), next);
   return unwrap(res);
 }
 
@@ -449,6 +486,150 @@ export function registerAdminCrm(admin: Command): void {
       configureAdminClient();
       print(crmUnwrap(await getCrmQuota({})).data, { json: opts.json });
     });
+
+  // ------------------------------------------------------------- suppressions
+  // Admin 1.9: the master CRM's unsubscribe list. `add` only stops messages
+  // (idempotent, safe direction), so it does not ask; `remove` re-enables
+  // sending to that person and the backend wants `confirm: true`.
+  const suppressions = crm
+    .command("suppressions")
+    .description("Unsubscribed people: the master CRM never writes to them");
+
+  tableOptions(
+    suppressions
+      .command("list")
+      .description("Unsubscribes, newest first (emails masked)")
+      .option("--query <text>", "full email or part of it")
+      .option(
+        "--scope <s>",
+        "global (platform only, default) | all (plus each organization's)",
+      )
+      .option("--limit <n>", "max results 1-500 (server default 100)"),
+  ).action(async (opts) => {
+    configureAdminClient();
+    const query: Record<string, unknown> = {};
+    if (opts.query) query.query = opts.query;
+    if (opts.scope) {
+      const scope = String(opts.scope).toLowerCase();
+      if (scope !== "global" && scope !== "all")
+        fail(`Invalid --scope: ${opts.scope}. Use global or all.`);
+      query.scope = scope;
+    }
+    if (opts.limit !== undefined) {
+      const n = Number(opts.limit);
+      if (!Number.isInteger(n) || n < 1 || n > 500)
+        fail(`Invalid --limit: ${opts.limit}. Use an integer from 1 to 500.`);
+      query.limit = n;
+    }
+    const body = crmUnwrap(await getCrmSuppressions({ query: query as never }));
+    printRows(body.data, opts, SUPPRESSION_COLUMNS);
+  });
+
+  suppressions
+    .command("add <email>")
+    .description(
+      "Unsubscribe a person from master CRM campaigns (idempotent; organizers' own campaigns are not affected)",
+    )
+    .option("--json", "raw JSON output")
+    .action(async (email, opts) => {
+      configureAdminClient();
+      const body = crmUnwrap(
+        await postCrmSuppressions({ body: { email: String(email).trim() } }),
+      );
+      print(body.data, { json: opts.json });
+    });
+
+  suppressions
+    .command("remove <email>")
+    .description(
+      "Remove a team-added unsubscribe: the person receives CRM campaigns again",
+    )
+    .option("--yes", "skip confirmation")
+    .option("--json", "raw JSON output")
+    .action(async (email, opts) => {
+      configureAdminClient();
+      const value = String(email).trim();
+      await confirmOrExit(
+        `Remove the unsubscribe of ${value}? Master CRM campaigns will reach them again`,
+        opts.yes,
+      );
+      const body = crmUnwrap(
+        await deleteCrmSuppressions({ body: { email: value, confirm: true } }),
+      );
+      print(body.data, { json: opts.json });
+    });
+
+  // ---------------------------------------------------------------- test-send
+  crm
+    .command("test-send")
+    .description(
+      "Send the composed message to YOURSELF as [Prueba] (your email, or your staff phone by WhatsApp)",
+    )
+    .requiredOption(
+      "--data <json>",
+      "message JSON: channel, sender, subject, body, templateName (WhatsApp), imageUrl, promotedEventId",
+    )
+    .option("--sender <s>", "freeticket | <workspaceId> (overrides --data)")
+    .option("--yes", "skip confirmation")
+    .option("--json", "raw JSON output")
+    .action(async (opts) => {
+      configureAdminClient();
+      const raw = parseData(opts.data);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw))
+        fail("--data must be a JSON object (channel, sender, subject, body).");
+      const input = { ...(raw as Record<string, unknown>) };
+      if (opts.sender) input.sender = parseSender(opts.sender);
+      const channel = String(input.channel ?? "?");
+      await confirmOrExit(
+        `Send a [Prueba] of "${String(input.subject ?? "(no subject)")}" by ${channel} to yourself${channel === "WHATSAPP" ? " (uses 1 of the daily WhatsApp quota)" : ""}?`,
+        opts.yes,
+      );
+      const body = crmUnwrap(
+        await postCrmTestSend({
+          body: { ...input, confirm: true } as AdminCrmTestSendInput,
+        }),
+      );
+      print(body.data, { json: opts.json });
+    });
+
+  // ------------------------------------------------------------ organizations
+  tableOptions(
+    crm
+      .command("organizations [query]")
+      .description(
+        "Active organizations by name or slug (for scope.level orgs or sender.workspaceId)",
+      ),
+  ).action(async (query, opts) => {
+    configureAdminClient();
+    const body = crmUnwrap(
+      await getCrmOrganizations({ query: query ? { query } : {} }),
+    );
+    printRows(body.data, opts, ORGANIZATION_COLUMNS);
+  });
+
+  // ------------------------------------------------------------------- people
+  const people = crm
+    .command("people")
+    .description("People inside an audience scope");
+
+  tableOptions(
+    people
+      .command("search <query>")
+      .description(
+        "Find people of a scope by email or name (full email: what the `people` filter condition takes)",
+      )
+      .option(
+        "--scope <json>",
+        "the filter's scope object (inline JSON or @scope.json); default: the whole platform",
+      ),
+  ).action(async (query, opts) => {
+    configureAdminClient();
+    const input: AdminCrmPeopleSearchInput = { query: String(query) };
+    if (opts.scope)
+      input.scope = parseData(opts.scope) as AdminCrmPeopleSearchInput["scope"];
+    const body = crmUnwrap(await postCrmPeopleSearch({ body: input }));
+    printRows(body.data, opts, PERSON_COLUMNS);
+  });
 
   // ------------------------------------------------------------------ preview
   crm
