@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.1
+
+### Patch Changes
+
+- 2f0ab6a: Sync the committed B2B contract with production: v1 1.55.0 → 1.60.0 (superadmin stays at 1.9.0). `ft settlements get` and `--json` carry `vatAmount`, the VAT included in `grossAmount` on MEMBERSHIP settlements (null on EVENT). No command changes.
+
 ## 0.15.0
 
 ### Minor Changes
